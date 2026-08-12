@@ -23,15 +23,22 @@ disagree, the SRS wins.
 
 Both get the block. They differ in ways worth knowing before reading anything else:
 
-| | iOS 26.4.1 | Android |
+Test devices: **iPhone, iOS 26.4.1** · **OnePlus 12R, Android 16 (OxygenOS 16)**.
+
+| | iOS 26.4.1 | Android 16 |
 |---|---|---|
 | Enforcement | OS refuses to open the app, draws a shield | We detect the launch and put our gate in front |
 | Route to the Gate | Shortcuts automation (26.5 would remove this) | Direct, no user setup |
 | Shortest enforced grant | 15 minutes, platform floor | Any duration |
 | Per-sender VIP alerts | **impossible** — needs a Professional account | works, no API needed |
 | Needs anyone's approval | Apple's, for distribution | no |
+| Survives our app being killed | yes — the OS enforces it | **no** — OxygenOS can switch it off silently |
 
-Why: [D-007](docs/DECISIONS.md), [D-008](docs/DECISIONS.md), [D-009](docs/DECISIONS.md).
+The last row is the important trade: Android is the more *capable* platform and iOS is the
+more *reliable* enforcer. Neither is strictly better.
+
+Why: [D-007](docs/DECISIONS.md), [D-008](docs/DECISIONS.md), [D-009](docs/DECISIONS.md),
+[D-010](docs/DECISIONS.md).
 
 ## Layout
 

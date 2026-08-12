@@ -21,16 +21,15 @@ permission, or Meta's.
 
 ## Build it
 
-1. Open `android-spike/` in Android Studio. It will offer to upgrade AGP and Kotlin —
-   accept. If it does, also bump `compileSdk`/`targetSdk` from 35 to 36 in
-   `app/build.gradle.kts`; compileSdk 36 needs AGP 8.9+.
-2. Plug in the Android phone with USB debugging on, and Run.
+**Target device: OnePlus 12R, Android 16 (OxygenOS 16).** `compileSdk`/`targetSdk` are set
+to 36 to match. Two consequences of that pairing are already handled in the code and
+explained below — read the OxygenOS section before you conclude anything is broken.
+
+1. Open `android-spike/` in Android Studio. It may offer to upgrade AGP and Kotlin —
+   accepting is fine.
+2. Plug in the phone with USB debugging on, and Run.
 3. There are **no dependencies at all** — no AndroidX, no Compose. If Gradle tries to
    resolve something beyond the Android plugin itself, something is wrong.
-
-**Tell me the Android version and phone model** (Settings → About phone). Several
-behaviours below fork on it, particularly the Restricted Settings step, and I have written
-against API 29–35 without knowing which you have.
 
 ## Grant the two permissions
 
@@ -51,16 +50,50 @@ confirm the warning dialog.
 
 ---
 
+## Then fight OxygenOS, which is the real adversary here
+
+OnePlus ships one of the most aggressive background-process killers of any Android OEM,
+and this app is exactly the kind it kills: two long-lived services doing nothing visible
+most of the time. Worse, **OxygenOS is known to silently revert battery-optimisation
+exemptions after a day or two** unless the app is locked in Recents.
+
+That matters more than it sounds. A blocker that dies quietly is worse than no blocker at
+all — you would trust it, stop noticing, and it would simply have stopped working. Assume
+this *will* happen and watch for it.
+
+Do all four, in this order:
+
+1. **Settings → Battery → Battery optimisation** → InstaKiller P0 → **Don't optimise**.
+2. **Settings → Battery → More settings** → turn off **Deep Optimisation** and **Sleep
+   Standby Optimisation**. The second one suspends network and background work overnight,
+   which is precisely when a notification listener needs to be alive.
+3. **Settings → Apps → InstaKiller P0 → Allow auto-launch** → on.
+4. **Open Recents, pull down on the InstaKiller card, tap the padlock.** This is the step
+   people skip, and it is the one that stops OxygenOS reverting step 1 on its own.
+
+Re-check all four after any OxygenOS update — they get reset.
+
+`dontkillmyapp.com/oneplus` is the community reference for this if the menu names have
+moved in OxygenOS 16; the settings exist under some name regardless.
+
+**During the spike, check the detection counter after a few hours of normal use.** If it
+stops incrementing while blocking is still switched on, the services were killed, and P1
+needs a watchdog — a periodic self-check that notices its own services are dead and tells
+you loudly. That is a real feature we would have to build, not a settings problem.
+
+---
+
 ## The checklist
 
 Screenshot the panel and fill in the blanks.
 
 ### Environment
-- [ ] Android version and model: `__________`
+- [ ] Panel reports Android 16 / API 36 and the OnePlus model
 - [ ] "Instagram installed" shows ✅
       *(❌ while Instagram is clearly installed means the `<queries>` block in the manifest
       is not taking effect — a real Android 11+ trap, tell me and I will fix it)*
 - [ ] Both permission rows show ✅
+- [ ] All four OxygenOS steps above done, including the padlock in Recents
 
 ### Q1 — Detection
 - [ ] Turn **Blocking ON**, leave the app, open Instagram
@@ -74,8 +107,18 @@ Screenshot the panel and fill in the blanks.
 - [ ] Did it appear **before** you could see any Instagram content, or after a flash of
       the feed? `__________`
 - [ ] Does the 4-second countdown run, with both buttons disabled until it finishes?
-- [ ] Press the system Back button during the countdown. Does it escape? `__________`
-      *(it should not — FR-13 depends on this)*
+- [ ] **Swipe back from the screen edge during the countdown.** Does it escape?
+      `__________`
+      *(it must not — FR-13 depends on this. Test the edge **swipe**, not a button: on
+      Android 16 with targetSdk 36 predictive back is on by default, `onBackPressed()` is
+      never called, and the gesture is the only back there is. This is handled with an
+      `OnBackInvokedCallback`; if the swipe escapes, that registration is failing and I
+      need to know)*
+- [ ] Does a peek animation show Instagram behind the gate as you start the swipe?
+      `__________`
+      *(cosmetic, but it undercuts the whole screen — tell me and I will suppress it)*
+- [ ] Swipe back **after** the countdown finishes. Do you land on the home screen?
+      `__________`
 - [ ] Press LEAVE after the countdown. Do you land on the home screen, not back in
       Instagram? `__________`
 - [ ] Open Instagram again immediately. Does the gate appear a second time? `__________`
@@ -99,6 +142,20 @@ the notification format and it varies:
 If DMs arrive with the sender in the title, FR-31's per-handle rules work as specified. If
 they arrive pre-grouped with no sender, the feature degrades to "Instagram wants you", and
 I would argue for cutting it rather than shipping something that vague.
+
+### Q5 — Survival **← run this one over days, not minutes**
+This is the question OxygenOS makes interesting, and none of the others matter if it fails.
+- [ ] Note the detection count now: `__________`
+- [ ] Use the phone normally for a day or two, opening Instagram as you would anyway
+- [ ] Detection count after: `__________` — still climbing?
+- [ ] Did the gate ever *not* appear when you opened Instagram? `__________`
+- [ ] Reboot the phone. Does the gate still appear afterwards, with no manual step?
+      `__________`
+- [ ] Re-check the four OxygenOS settings. Did any revert on their own? `__________`
+
+If the answer to that last one is yes, we build the watchdog in P1 and the app tells you
+when it has been muzzled. If the services survive untouched for a week, Android is the
+more reliable of your two platforms and that changes which one we treat as primary.
 
 ### Q4 — The resistance ceiling
 Worth knowing exactly how weak this is before we build strictness features on top of it.

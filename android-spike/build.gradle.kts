@@ -1,7 +1,7 @@
-// Conservative, known-consistent versions. Android Studio will almost certainly offer to
-// upgrade both on first open — accept it. If you do, bump compileSdk/targetSdk in
-// app/build.gradle.kts to 36 at the same time; compileSdk 36 needs AGP 8.9 or newer.
+// AGP 8.9.1 is the floor for compileSdk 36 (Android 16), which the target device runs.
+// Android Studio may offer newer — accepting is fine, these are just a known-consistent
+// starting pair.
 plugins {
-    id("com.android.application") version "8.7.3" apply false
-    id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+    id("com.android.application") version "8.9.1" apply false
+    id("org.jetbrains.kotlin.android") version "2.1.0" apply false
 }

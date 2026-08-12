@@ -75,6 +75,27 @@ We work around it where it matters: a schedule's `warningTime` gives us a callba
 a 15-minute schedule underneath, and if the callback is late the block comes back late.
 A 3-minute permit is therefore *approximately* 3 minutes, not exactly.
 
+## On Android, your phone may switch the block off without telling you
+
+This one is specific to the OnePlus and it is the most likely way the Android version
+fails you.
+
+On iPhone, the block is enforced by iOS itself. Our app can be closed, killed, or never
+opened for a month, and Instagram stays blocked. On Android there is no such system — **the
+block is our app running.** If OxygenOS decides to kill our background services to save
+battery, the block stops, and nothing on screen tells you.
+
+OnePlus is unusually aggressive about this, and is known to quietly undo the
+"don't optimise this app" setting days after you grant it. So we do two things:
+
+- Onboarding walks you through four settings, including locking the app in the Recents
+  list, which is the step that stops the others being reverted.
+- The app watches its own pulse. If the enforcement services have been dead, the Front
+  Desk says so in red and names the setting to check. It will not show you a clean streak
+  it did not earn.
+
+Re-check those settings after any OxygenOS update. They get reset.
+
 ## The block is only as strong as your ability to delete this app
 
 Deleting Insta_killer removes its shields. There is no way around that. Anything we

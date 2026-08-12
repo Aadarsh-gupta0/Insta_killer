@@ -5,6 +5,39 @@ why. Newest first.
 
 ---
 
+## 2026-08-12 — D-010: OEM process death is an expected failure, and the app must announce it
+
+**Context:** the Android device is a **OnePlus 12R on Android 16 / OxygenOS 16**. OnePlus
+runs one of the most aggressive background-process killers of any OEM, and is documented as
+*silently reverting* battery-optimisation exemptions days after the user grants them unless
+the app is locked in the Recents list.
+
+**Chosen:** treat the enforcement services dying as a normal operating condition rather
+than an error. P1 adds a watchdog — a heartbeat the services write and the app checks —
+and when the heartbeat is stale the app says so **on the Front Desk, in `stamp` red**,
+naming the OxygenOS setting that most likely caused it.
+
+**Rejected:** documenting the battery settings in onboarding and assuming they hold.
+
+**Why:** a blocker that dies quietly is strictly worse than no blocker. The user stops
+noticing the gate, concludes the habit is under control, and the app is now actively
+lying by omission — it is displaying a streak it did not earn. NFR-7 makes honesty a
+requirement, and the only way to be honest about this is to detect it. Onboarding
+instructions cannot, because the setting reverts *after* onboarding.
+
+**Cost:** a periodic check that itself has to survive, which is a little circular. The way
+out is that the watchdog lives in the *app*, not the services: whenever the app is
+foregrounded it compares the last heartbeat against the clock. That is enough — a user who
+never opens the app also is not being lied to by it.
+
+**Note:** this asymmetry is worth stating plainly. iOS shields are enforced by the OS and
+survive our app being killed; Android's enforcement *is* our process, so it dies when the
+OEM decides it dies. iOS is the more reliable enforcer even though Android is the more
+capable platform. Q5 in `P0_SPIKE_ANDROID.md` measures how bad this actually is before we
+build anything on the assumption.
+
+---
+
 ## 2026-08-12 — D-009: Target device is iOS 26.4.1 — Shortcuts is the primary Gate route
 
 **Context:** the iPhone is on **iOS 26.4.1**. That lands between the two APIs that matter:
