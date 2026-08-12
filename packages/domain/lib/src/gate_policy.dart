@@ -1,0 +1,170 @@
+/// The one question both platforms ask: may a permit be issued right now?
+///
+/// Everything else in this package feeds this. Keeping the answer in one pure function
+/// is what stops iOS and Android drifting apart (D-007) and what lets the rules be tested
+/// without a device (NFR-5).
+library;
+
+import 'clock.dart';
+import 'event.dart';
+import 'permit.dart';
+import 'quota.dart';
+import 'schedule.dart';
+
+/// FR-14 — a typed reason of at least this many characters.
+const int minimumReasonLength = 12;
+
+/// Everything the decision depends on, in one object.
+class OfficeRules {
+  const OfficeRules({
+    this.quota = QuotaPolicy.standard,
+    WeeklySchedule? schedule,
+    this.strictMode = true,
+    this.grantDuration = defaultGrantDuration,
+    this.blockedAppCount = 0,
+  }) : _schedule = schedule;
+
+  final QuotaPolicy quota;
+  final WeeklySchedule? _schedule;
+  final bool strictMode;
+  final Duration grantDuration;
+
+  /// Only the count — the tokens themselves are opaque and live on the platform side
+  /// (C-3). It is here because removing an app is a loosening change (FR-25) and the
+  /// cooldown classifier needs something to compare.
+  final int blockedAppCount;
+
+  WeeklySchedule get schedule => _schedule ?? WeeklySchedule.empty();
+
+  OfficeRules copyWith({
+    QuotaPolicy? quota,
+    WeeklySchedule? schedule,
+    bool? strictMode,
+    Duration? grantDuration,
+    int? blockedAppCount,
+  }) =>
+      OfficeRules(
+        quota: quota ?? this.quota,
+        schedule: schedule ?? this.schedule,
+        strictMode: strictMode ?? this.strictMode,
+        grantDuration: grantDuration ?? this.grantDuration,
+        blockedAppCount: blockedAppCount ?? this.blockedAppCount,
+      );
+}
+
+enum RefusalReason {
+  quotaExhausted,
+  scheduledWindow,
+  reasonTooShort,
+  permitAlreadyActive,
+  clockTampered,
+}
+
+/// The answer, with everything the UI needs to explain itself.
+///
+/// NFR-4 requires every refusal to state the reason and the next possible time, so a
+/// refusal carries [availableAt] rather than making the caller work it out.
+sealed class GateDecision {
+  const GateDecision();
+}
+
+class PermitGranted extends GateDecision {
+  const PermitGranted(this.permit);
+
+  final Permit permit;
+}
+
+class PermitRefused extends GateDecision {
+  const PermitRefused({
+    required this.reason,
+    this.availableAt,
+    this.detail,
+  });
+
+  final RefusalReason reason;
+
+  /// When this refusal stops applying. Null means "not from waiting" — a reason that is
+  /// too short is fixed by typing more, not by time.
+  final DateTime? availableAt;
+
+  final String? detail;
+}
+
+class GatePolicy {
+  const GatePolicy(this.rules);
+
+  final OfficeRules rules;
+
+  /// Order matters. The checks run cheapest-and-most-absolute first so that the refusal
+  /// the user sees is the most fundamental one — being told "your reason is too short"
+  /// and then, after fixing it, "and also the quota is gone" is worse than one honest no.
+  GateDecision evaluate({
+    required Clock clock,
+    required Iterable<Event> events,
+    required String reason,
+    Permit? activePermit,
+    PermitTag tag = PermitTag.standard,
+    String Function()? idFactory,
+    ClockGuard? guard,
+  }) {
+    final now = clock.wall();
+
+    if (guard != null && guard.observe(now)) {
+      return const PermitRefused(
+        reason: RefusalReason.clockTampered,
+        detail: 'The device clock moved backwards.',
+      );
+    }
+
+    if (activePermit != null && activePermit.status(clock).active) {
+      final status = activePermit.status(clock);
+      return PermitRefused(
+        reason: RefusalReason.permitAlreadyActive,
+        availableAt: now.add(status.remaining),
+        detail: 'A permit is already running.',
+      );
+    }
+
+    // FR-23: a scheduled window beats the quota. Having permits left is irrelevant
+    // inside one, and the copy must not imply otherwise.
+    if (rules.schedule.isBlockedAt(now)) {
+      return PermitRefused(
+        reason: RefusalReason.scheduledWindow,
+        availableAt: rules.schedule.blockedUntil(now),
+        detail: 'A scheduled block is in force.',
+      );
+    }
+
+    final quotaState = rules.quota.stateAt(now, events);
+    if (quotaState.exhausted) {
+      return PermitRefused(
+        reason: RefusalReason.quotaExhausted,
+        availableAt: quotaState.resetsAt,
+        detail: 'Pad empty.',
+      );
+    }
+
+    if (reason.trim().length < minimumReasonLength) {
+      return const PermitRefused(
+        reason: RefusalReason.reasonTooShort,
+        detail: 'State a reason of at least '
+            '$minimumReasonLength characters.',
+      );
+    }
+
+    return PermitGranted(
+      Permit(
+        id: (idFactory ?? _defaultId)(),
+        issued: ClockStamp.now(clock),
+        duration: rules.grantDuration,
+        reason: reason.trim(),
+        tag: tag,
+      ),
+    );
+  }
+
+  static int _counter = 0;
+
+  static String _defaultId() =>
+      '${DateTime.now().microsecondsSinceEpoch}-${_counter++}';
+}

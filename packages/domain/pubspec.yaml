@@ -1,0 +1,16 @@
+name: insta_killer_domain
+description: >-
+  The rules of Insta_killer, in pure Dart. Quota, permits, schedules, cooldowns,
+  streaks and clock-tamper resolution.
+
+  This package has no Flutter dependency and must never gain one — NFR-6 requires the
+  domain layer to be reusable across iOS and Android, and the cheapest way to enforce
+  that is to make a platform import fail to resolve.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+dev_dependencies:
+  test: ^1.25.0

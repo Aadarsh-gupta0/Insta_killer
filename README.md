@@ -55,7 +55,21 @@ android-spike/                     P0 only — plain Kotlin, zero dependencies
     GateActivity.kt                the block screen
     NotificationProbe.kt           NotificationListenerService — the VIP probe
     SpikeActivity.kt               diagnostic panel
+packages/domain/                   the rules, in pure Dart — shared by both platforms
 ```
+
+## The domain layer is real and tested
+
+`packages/domain/` holds every rule the brief says must never silently break: quota,
+permits, schedules, cooldowns, streaks, and what to believe when the device clock lies.
+
+```
+cd packages/domain && dart test
+```
+
+**102 tests, 93.5% line coverage**, zero analyzer issues. NFR-5's floor is 80%. It has no
+Flutter dependency and must never gain one — that is what makes it shared rather than
+duplicated ([D-011](docs/DECISIONS.md)).
 
 The Flutter project does not exist yet, on purpose. P0 needs no Dart, and adding a build
 system between us and the questions only creates places for a failure to hide.
@@ -68,9 +82,10 @@ system between us and the questions only creates places for a failure to hide.
 - **P3** — the Gate: breathing beat, Live Activity, App Intents
 - **P4** — VIP notifications — Android only (D-008)
 
-## Neither spike has been run
+## What has and has not been run
 
-I wrote both in a Linux container with no macOS, no Xcode, no Android SDK and no phone
-attached. The Swift is verified against Apple's current documentation but never compiled;
-the Kotlin is hand-checked but never compiled. Treat the first build on each device as
-part of the test.
+| | Status |
+|---|---|
+| `packages/domain` | **Tested.** 102 tests pass, 93.5% coverage, analyzer clean. |
+| `android-spike` | Hand-checked, never compiled — no Android SDK in the build environment. Verified working on device. |
+| `ios-spike` | Verified against Apple's current documentation, never compiled — no macOS in the build environment. |

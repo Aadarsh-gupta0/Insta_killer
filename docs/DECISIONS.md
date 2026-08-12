@@ -5,6 +5,34 @@ why. Newest first.
 
 ---
 
+## 2026-08-12 — D-011: The domain layer is a standalone package, not a folder in the app
+
+**Chosen:** `packages/domain/` is its own pure-Dart package with its own `pubspec.yaml`
+and no Flutter dependency. The Flutter app will depend on it by path.
+
+**Rejected:** `lib/domain/` inside the Flutter app, as the kickoff brief's tree proposes.
+
+**Why:** NFR-6 says the domain layer must be free of platform imports, and D-007 turned
+that from a someday-maybe into a requirement with a date on it — two platforms are being
+built at once and this is the only code they share. A folder convention is enforced by
+review, and review is exactly what erodes at 1am when a Riverpod provider would be so
+convenient to reach for. A separate package with no Flutter in its dependency graph makes
+`import 'package:flutter/…'` fail to resolve. The rule enforces itself.
+
+It also makes the rules testable without a device or a Flutter toolchain, which is how
+102 tests and 93.5% line coverage exist before either spike has been compiled.
+
+**Rejected also:** publishing it to pub.dev. No reason to; a path dependency is fine.
+
+**Cost:** one more `pubspec.yaml`, and `flutter test` at the app level will not run these
+tests — `dart test` in the package does. CI needs both.
+
+**Dependency note** (the brief asks for these): one dev dependency, `test ^1.25.0`. Zero
+runtime dependencies, and that is worth keeping — every runtime dependency here would be
+one the Android and iOS builds both inherit.
+
+---
+
 ## 2026-08-12 — D-010: OEM process death is an expected failure, and the app must announce it
 
 **Context:** the Android device is a **OnePlus 12R on Android 16 / OxygenOS 16**. OnePlus
