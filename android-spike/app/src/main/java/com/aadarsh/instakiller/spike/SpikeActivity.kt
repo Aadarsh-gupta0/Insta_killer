@@ -200,4 +200,6 @@ class SpikeActivity : Activity() {
             )
         )
     }
+
+    private fun yesNo(value: Boolean): String = if (value) "YES" else "NO"
 }
