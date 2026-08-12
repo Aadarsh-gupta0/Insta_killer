@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">InstaKiller P0</string>
+
+    <!-- Shown on the system's accessibility permission screen. Android displays this
+         verbatim, so it has to be honest about scope, not marketing copy. -->
+    <string name="accessibility_description">Detects when Instagram comes to the foreground so the gate can be shown. Reads no screen content and watches no other app.</string>
+</resources>

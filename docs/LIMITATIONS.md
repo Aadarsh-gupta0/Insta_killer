@@ -40,24 +40,30 @@ block could stop applying. We check for this on every foreground.
 No screen reading, no content access, no history. The app has no idea whether you
 scrolled for the full 15 minutes or opened it and closed it immediately.
 
-## We cannot read Instagram's notifications
+## On iPhone, we cannot read Instagram's notifications. On Android, we can.
 
-iOS has no notification-listener API. Android has one; iOS does not, and it is not
-close to shipping. So "tell me when a specific person messages me" cannot be done by
-watching notifications on this phone.
+This is the one place where the two versions of this app are genuinely unequal, and it is
+worth being blunt about it.
 
-The only legitimate route is Meta's official API, which requires:
+**iPhone.** iOS has no notification-listener API of any kind. "Tell me when a specific
+person messages me" cannot be done by watching notifications, and no amount of engineering
+changes that. The only legitimate route is Meta's official API, which requires your
+Instagram account to be a **Professional/Business** account, plus a Meta developer app,
+plus Meta's App Review approval, plus a backend of ours.
 
-- your Instagram account converted to a **Professional/Business** account,
-- a Meta developer app,
-- Meta's App Review approval for messaging permissions,
-- and a small backend of ours to receive the webhooks and forward a push.
+Your account is personal and staying personal, so **on iPhone the VIP feature is a digest
+reminder, permanently.** It notes what you said you were going for when you open a VIP
+check, and reminds you of it. It does not watch anything. The screen says `Digest only`
+and will never say anything else on this device.
 
-Until all four exist, the VIP feature runs in **Digest** mode and says so on screen. It
-will never pretend to be watching something it isn't.
+**Android.** `NotificationListenerService` lets us read Instagram's notifications on the
+phone, including who they are from. Per-person VIP alerts work there for real, with no
+Meta API, no backend, no App Review and no account conversion. This is the feature you
+originally asked for, and it exists on exactly one of your two phones.
 
 We will never ask for your Instagram password, never scrape the site, and never
-automate a logged-in session. Those break Meta's terms and put your account at risk.
+automate a logged-in session, on either platform. Those break Meta's terms and put your
+account at risk.
 
 ## The shortest enforced block is 15 minutes
 
@@ -97,11 +103,20 @@ runs inside our app, and our app has to be brought to the foreground for you to 
 There are two ways that happens, and both have caveats:
 
 - **From the shield's button.** iOS 26.5 added a way for the block screen's button to
-  open our app directly. On iOS 26.5 and later this is reliable. **On anything earlier
-  it does not exist**, and the fallback is a notification you have to tap.
+  open our app directly. **Your phone is on 26.4.1, so this does not exist for you yet.**
+  The fallback is a notification you have to tap, which can be delayed by a Focus mode or
+  by Apple Intelligence's notification summaries. Updating to iOS 26.5 or later would make
+  this route reliable and is the single highest-value thing you could do to strengthen the
+  app — but it is not required, and nothing is broken without it.
 - **From a Shortcuts automation** you create during onboarding. This works on any
   version, but you can delete the automation. We check weekly that it still exists and
-  say so if it doesn't.
+  say so if it doesn't. On 26.4.1 this is the *primary* route, not a backup.
+
+One consequence we have not yet been able to test: it is not documented whether an "App
+Opened" automation fires at all while an app is shielded. If it does not, then on 26.4.1
+the Gate screen can only appear when enforcement is off. That would not weaken the block —
+it would mean the elaborate friction screen and the hard block are alternatives rather than
+a sequence. We will know after the first device test.
 
 ## Distribution
 

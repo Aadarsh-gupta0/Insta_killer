@@ -77,6 +77,11 @@ Activity** if it is off. Authorization fails without it.
 Fill this in and send it back. The app's own screen mirrors these rows, so a screenshot
 plus the two Instagram results is a complete report.
 
+> **Device is on iOS 26.4.1** (confirmed 12 Aug 2026). Expect the
+> `.openParentalControlsApp` row to read **unavailable** and the submenu row to read
+> **available**. If either says otherwise, stop and tell me — it means the availability
+> data I verified against Apple's documentation is wrong, and D-009 needs rewriting.
+
 ### Environment
 - [ ] Exact iOS version (Settings → General → About → Software Version): `__________`
 - [ ] App Group row shows ✅, not "NOT CONFIGURED"
@@ -118,6 +123,11 @@ plus the two Instagram results is a complete report.
 ## Two things I could not determine from the documentation
 
 Both are empirical and both change the design. Please answer them while you are in there.
+
+**A is now the most important test in P0 — more important than Q4.** On iOS 26.4.1 the
+shield button cannot open our app, so a Shortcuts automation is the *only* route to the
+Gate screen. If it does not fire while shielded, the Gate and the block cannot coexist and
+the product's shape changes. Do this one first.
 
 **A. Does a Shortcuts "App Opened" automation fire while the app is shielded?**
 

@@ -5,6 +5,102 @@ why. Newest first.
 
 ---
 
+## 2026-08-12 — D-009: Target device is iOS 26.4.1 — Shortcuts is the primary Gate route
+
+**Context:** the iPhone is on **iOS 26.4.1**. That lands between the two APIs that matter:
+
+| API | Needs | Available here |
+|---|---|---|
+| `ShieldConfiguration.secondaryButtonSubmenuItems` | 26.4 | ✅ |
+| `ShieldActionResponse.openParentalControlsApp` | 26.5 | ❌ |
+| `ManagedSettingsStore.isActive` | 26.5 | ❌ |
+| `ManagedSettingsStore.TokenExpiryMessage` | 26.5 | ❌ |
+
+**Chosen:** ship the brief's original two-path architecture. The shield enforces; the
+Shortcuts automation is how the Gate gets on screen. Grants are applied by clearing and
+restoring `shield.applications` (the D-003 fallback), with the token set mirrored in the
+App Group so the monitor extension can always restore it.
+
+**Rejected:** asking you to update to iOS 26.5 before we start.
+
+**Why:** an OS upgrade is a real imposition and 26.5 is not required for a working
+product — it is required for a *simpler* one. All the 26.5 code paths are already written
+and version-gated, so if you update at any point the better architecture activates with no
+work from me. That said, the difference is not cosmetic: on 26.5 the Gate is reachable
+from the shield itself, which removes the single most fragile dependency in the product
+(an automation you can delete, and which may not even fire while an app is shielded — see
+open question A in `P0_SPIKE.md`). Worth doing when convenient. Your call, not a blocker.
+
+**Immediate consequence:** open question A is no longer a curiosity, it is the load-bearing
+unknown. If a Shortcuts "App Opened" automation does *not* fire while Instagram is
+shielded, then on 26.4.1 there is **no route to the Gate at all** while enforcement is on,
+and the Gate only ever appears in Gate-only mode with the shield disabled. Test it first.
+
+**Silver lining:** 26.4's submenu means the secondary button can offer *three* actions
+without a screen — "15-minute permit", "VIP check", "Not now" — which recovers some of
+what the missing `.openParentalControlsApp` costs us, since a plain permit no longer needs
+the Gate at all.
+
+---
+
+## 2026-08-12 — D-008: The VIP feature is an Android feature; iOS is capped at Digest
+
+**Context:** the Instagram account is **personal**, and staying personal.
+
+**Chosen:** iOS implements Rung 0 (Digest) only, permanently, and says so in the UI.
+Android implements real per-sender VIP alerts with `NotificationListenerService`.
+
+**Rejected:** keeping Rung 1 (Meta Graph API) on the iOS roadmap as "future work".
+
+**Why:** Rung 1 is not merely unbuilt, it is *unreachable* without converting the account
+to Professional — that is a hard Meta precondition, not a technical difficulty we could
+engineer around. Leaving it on the roadmap would be dishonest about a capability that is
+gated on a decision already made. FR-32's three states collapse to two on iOS: `Digest
+only` and nothing else.
+
+Android has no such gate. `NotificationListenerService` delivers Instagram's own
+notifications with the sender in `EXTRA_TITLE`, which is precisely the per-handle filtering
+FR-31 asks for, with no API, no backend, no App Review and no account conversion.
+
+**Consequence:** the feature the user originally asked for — *"tell me if there's important
+notifications from my favourite persons"* — is an Android-only capability. That is now one
+of the stronger arguments for D-007, and it should be stated plainly in onboarding on both
+platforms rather than buried.
+
+**Cost:** the two platforms are genuinely unequal in a user-visible way. Do not paper over
+it with shared UI copy.
+
+---
+
+## 2026-08-12 — D-007: iOS and Android built in parallel, sharing the Dart domain layer
+
+**Chosen:** both platforms proceed together. `lib/domain/` stays free of platform imports
+(NFR-6) and is the shared asset; everything below it is written twice, natively.
+
+**Rejected:** the SRS's v1.0 = iOS-only scoping, with Android deferred to v2 (Appendix D).
+
+**Why:** three reasons, in order of weight.
+
+1. **Android is where the VIP feature can actually exist** (D-008). On iOS it is capped at
+   a digest reminder forever.
+2. **Android carries none of the entitlement risk.** R-1 — Family Controls entitlement not
+   granted — is rated as making the enforcement core unshippable. Android needs no Apple
+   approval, so a working blocker exists regardless of how R-1 resolves.
+3. **Android can do the thing iOS refuses to.** An `AccessibilityService` can send
+   Instagram to the background the instant it foregrounds. That is much closer to the
+   original "kill Instagram when I open it" than iOS's shield, and it is fully supported.
+
+**Cost:** two enforcement implementations to maintain, and a real risk of the platforms
+drifting apart in behaviour. Mitigated by keeping every rule in Dart and treating the
+native layers as dumb actuators — the same discipline as D-002, applied twice.
+
+**Note on Play Store policy:** `AccessibilityService` and `NotificationListenerService`
+both have restrictive Play policies for non-accessibility use. This build is sideloaded to
+one phone, so neither applies. If distribution is ever considered, revisit — the policies
+are the binding constraint, not the APIs.
+
+---
+
 ## 2026-08-12 — D-006: P0 ships as a standalone native spike, not a Flutter app
 
 **Chosen:** `ios-spike/` is a small pure-SwiftUI target with no Flutter in it at all.
@@ -48,6 +144,11 @@ late, never that it fails to return. Documented in LIMITATIONS.md.
 ---
 
 ## 2026-08-12 — D-004: The shield button opens our app directly on iOS 26.5+; Shortcuts is the fallback
+
+> **Superseded in part on 2026-08-12 by D-009.** The device is on iOS 26.4.1, so
+> `.openParentalControlsApp` is *not* available and Shortcuts remains the primary route to
+> the Gate. The code path stays — it is version-gated and costs nothing — but the
+> architecture ships on the fallback. Read D-009 with this entry.
 
 **Chosen:** `ShieldActionExtension` returns `.openParentalControlsApp` where available,
 falling back to a tapped local notification, falling back to `.close` plus the Shortcuts
