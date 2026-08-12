@@ -17,7 +17,7 @@ class WeeklySchedule {
   WeeklySchedule(Iterable<int> blockedCells)
       : _cells = Set.unmodifiable(blockedCells.map(_requireValid));
 
-  WeeklySchedule.empty() : _cells = const {};
+  const WeeklySchedule.empty() : _cells = const {};
 
   /// Every day, between two times of day. [endHour]:[endMinute] is exclusive.
   factory WeeklySchedule.daily({

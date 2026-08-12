@@ -1,0 +1,48 @@
+name: insta_killer
+description: An intentional-access gate for Instagram.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The rules. Path dependency, never published — see D-011. If you find yourself
+  # wanting to add a Flutter import to this package, the answer is no.
+  insta_killer_domain:
+    path: packages/domain
+
+  # Named in the SRS §2.4 as the state solution, so not a new decision.
+  flutter_riverpod: ^2.6.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+  # SRS §3.7 specifies Pigeon-typed channels for the platform bridge. Preferred over a
+  # wrapper plugin per the kickoff brief §8.
+  pigeon: ^22.7.0
+
+flutter:
+  uses-material-design: false
+
+  # Bundled, not fetched. NFR-3 keeps behavioural data local and the app has no reason to
+  # touch the network at runtime; `google_fonts` would download these on first paint,
+  # which is both a network call and a blank frame on the Gate's critical path.
+  # All three are OFL — licences ship alongside them in assets/fonts/.
+  fonts:
+    - family: ArchivoNarrow
+      fonts:
+        - asset: assets/fonts/ArchivoNarrow.ttf
+    - family: SpaceMono
+      fonts:
+        - asset: assets/fonts/SpaceMono-Regular.ttf
+        - asset: assets/fonts/SpaceMono-Bold.ttf
+          weight: 700
+    - family: IBMPlexSans
+      fonts:
+        - asset: assets/fonts/IBMPlexSans.ttf

@@ -1,91 +1,82 @@
 # Insta_killer
 
 An intentional-access gate for Instagram. When you open Instagram, Instagram does not
-open — a gate appears, and the only way past is to tear off one of a finite number of
+open — a gate appears, and the only way past is to spend one of a finite number of
 15-minute permits.
 
-**Status: P0, feasibility spike. Written, not yet run on device.**
+**Shipping platform: Android.** iOS is paused, not abandoned ([D-012](docs/DECISIONS.md)).
+Test device: OnePlus 12R, Android 16 (OxygenOS 16).
+
+## State of things
+
+| | Status |
+|---|---|
+| `packages/domain` — the rules | **102 tests, 93.5% coverage.** Analyzer clean. |
+| `lib/` — the Flutter app | **26 widget tests.** Gate and Front Desk built and passing. |
+| `android-spike/` — enforcement proof | Verified working on device. Not yet merged into the app. |
+| Native wiring — services → Flutter gate | **Next.** Not started. |
+| `ios-spike/` | Written, never compiled. Paused. |
+
+```
+dart test           # in packages/domain — the rules
+flutter test        # at the root — the screens
+flutter analyze     # clean
+```
+
+Nothing in this repository has been compiled for Android. The build environment has no
+Android SDK (`dl.google.com` is blocked by network policy), so Dart and Flutter tests are
+the full extent of what has been verified here. The Kotlin is hand-checked.
 
 ## Read these first
 
 | Document | What it is |
 |---|---|
-| [`docs/P0_SPIKE.md`](docs/P0_SPIKE.md) | **iOS runbook.** Build the spike, answer four questions, report back. |
-| [`docs/P0_SPIKE_ANDROID.md`](docs/P0_SPIKE_ANDROID.md) | **Android runbook.** Same, for the other phone. |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Every architectural choice, with the option it rejected. Start at D-012. |
 | [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | What this app cannot do, in plain language. Ships with the build. |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Every architectural choice, with the option it rejected. |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Control flow and layers. Provisional until P0 reports. |
+| [`docs/P0_SPIKE_ANDROID.md`](docs/P0_SPIKE_ANDROID.md) | The device runbook, including the OxygenOS survival check. |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Control flow. iOS-shaped and now partly stale — see D-012. |
+| [`docs/P0_SPIKE.md`](docs/P0_SPIKE.md) | iOS runbook. Paused; the entry point if it resumes. |
 
 Requirements live in the SRS (v1.0, 12 Aug 2026). Where the kickoff brief and the SRS
 disagree, the SRS wins.
 
-## The two platforms are not equivalent
-
-Both get the block. They differ in ways worth knowing before reading anything else:
-
-Test devices: **iPhone, iOS 26.4.1** · **OnePlus 12R, Android 16 (OxygenOS 16)**.
-
-| | iOS 26.4.1 | Android 16 |
-|---|---|---|
-| Enforcement | OS refuses to open the app, draws a shield | We detect the launch and put our gate in front |
-| Route to the Gate | Shortcuts automation (26.5 would remove this) | Direct, no user setup |
-| Shortest enforced grant | 15 minutes, platform floor | Any duration |
-| Per-sender VIP alerts | **impossible** — needs a Professional account | works, no API needed |
-| Needs anyone's approval | Apple's, for distribution | no |
-| Survives our app being killed | yes — the OS enforces it | **no** — OxygenOS can switch it off silently |
-
-The last row is the important trade: Android is the more *capable* platform and iOS is the
-more *reliable* enforcer. Neither is strictly better.
-
-Why: [D-007](docs/DECISIONS.md), [D-008](docs/DECISIONS.md), [D-009](docs/DECISIONS.md),
-[D-010](docs/DECISIONS.md).
-
 ## Layout
 
 ```
-docs/                              specs, decisions, limitations
-ios-spike/                         P0 only — standalone SwiftUI, no Flutter (D-006)
-  InstaKillerSpike/                app target
-  ShieldConfigurationExtension/    what the block screen looks like
-  ShieldActionExtension/           what its buttons do
-  Entitlements/                    reference entitlements to compare against
-android-spike/                     P0 only — plain Kotlin, zero dependencies
-  app/src/main/java/…/
-    ForegroundWatcher.kt           AccessibilityService — detects the launch
-    GateActivity.kt                the block screen
-    NotificationProbe.kt           NotificationListenerService — the VIP probe
-    SpikeActivity.kt               diagnostic panel
-packages/domain/                   the rules, in pure Dart — shared by both platforms
+packages/domain/       the rules, pure Dart, no Flutter import ever (D-011)
+  clock · quota · permit · schedule · strictness · streak · insights
+
+lib/
+  app/providers.dart   Riverpod wiring; the only place rules meet UI
+  data/                repository seam — in-memory today, Pigeon-backed next
+  design/tokens.dart   the Permit Office: palette, type, spacing, motion
+  features/gate/       the reflex interrupt — 4s pause, declaration, reason
+  features/home/       Front Desk
+
+android/               the Flutter app's Android project
+android-spike/         standalone P0 proof: AccessibilityService, gate, notification probe
+ios-spike/             paused
 ```
 
-## The domain layer is real and tested
+## Why Android is the better platform here
 
-`packages/domain/` holds every rule the brief says must never silently break: quota,
-permits, schedules, cooldowns, streaks, and what to believe when the device clock lies.
+Not a consolation prize. It does two things iOS cannot:
 
-```
-cd packages/domain && dart test
-```
+- **Interrupts the launch itself.** An `AccessibilityService` is told the instant
+  Instagram foregrounds and puts our gate in front of it — closer to the original
+  *"kill Instagram whenever I open it"* than iOS's shield ever gets.
+- **Reads Instagram's notifications**, which makes per-sender VIP alerts real. On iOS
+  that needs a Professional account and Meta App Review, and is permanently unavailable
+  here ([D-008](docs/DECISIONS.md)).
 
-**102 tests, 93.5% line coverage**, zero analyzer issues. NFR-5's floor is 80%. It has no
-Flutter dependency and must never gain one — that is what makes it shared rather than
-duplicated ([D-011](docs/DECISIONS.md)).
+The trade is honest and worth knowing: iOS shields are enforced by the OS and survive our
+app being killed. On Android the block *is* our process, so OxygenOS can switch it off
+silently. That is why the app watches its own pulse ([D-010](docs/DECISIONS.md)).
 
-The Flutter project does not exist yet, on purpose. P0 needs no Dart, and adding a build
-system between us and the questions only creates places for a failure to hide.
+## Next
 
-## Phases
-
-- **P0** — feasibility spikes, both platforms ← *here*
-- **P1** — enforcement core: permit round-trip, quota, event log
-- **P2** — the Flutter product: design system, nine screens, Strict Mode
-- **P3** — the Gate: breathing beat, Live Activity, App Intents
-- **P4** — VIP notifications — Android only (D-008)
-
-## What has and has not been run
-
-| | Status |
-|---|---|
-| `packages/domain` | **Tested.** 102 tests pass, 93.5% coverage, analyzer clean. |
-| `android-spike` | Hand-checked, never compiled — no Android SDK in the build environment. Verified working on device. |
-| `ios-spike` | Verified against Apple's current documentation, never compiled — no macOS in the build environment. |
+1. Merge the spike's services into `android/`, and launch the Flutter Gate from
+   `ForegroundWatcher` instead of the throwaway `GateActivity`.
+2. Pigeon bridge, so the Dart rules and the native services read one store.
+3. Permit expiry via `AlarmManager`, boot receiver, and the D-010 watchdog.
+4. Remaining screens: Blocklist, Hours, The Record, Office Rules, onboarding.

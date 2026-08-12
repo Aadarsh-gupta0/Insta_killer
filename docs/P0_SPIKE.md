@@ -1,4 +1,10 @@
-# P0 — feasibility spike
+# P0 — feasibility spike (iOS)
+
+> **PAUSED as of 12 August 2026.** Development moved to Android only — see D-012. Nothing
+> below is wrong or abandoned; it is the entry point for resuming, and the Swift in
+> `ios-spike/` is untouched. If you do resume, updating the device to iOS 26.5 first is
+> worth more than anything else on this page (D-009).
+
 
 **Status: written, not run.** I built this in a Linux container with no macOS, no Xcode
 and no iOS device attached. Family Controls cannot be exercised anywhere except a real

@@ -18,14 +18,14 @@ const int minimumReasonLength = 12;
 class OfficeRules {
   const OfficeRules({
     this.quota = QuotaPolicy.standard,
-    WeeklySchedule? schedule,
+    this.schedule = const WeeklySchedule.empty(),
     this.strictMode = true,
     this.grantDuration = defaultGrantDuration,
     this.blockedAppCount = 0,
-  }) : _schedule = schedule;
+  });
 
   final QuotaPolicy quota;
-  final WeeklySchedule? _schedule;
+  final WeeklySchedule schedule;
   final bool strictMode;
   final Duration grantDuration;
 
@@ -33,8 +33,6 @@ class OfficeRules {
   /// (C-3). It is here because removing an app is a loosening change (FR-25) and the
   /// cooldown classifier needs something to compare.
   final int blockedAppCount;
-
-  WeeklySchedule get schedule => _schedule ?? WeeklySchedule.empty();
 
   OfficeRules copyWith({
     QuotaPolicy? quota,

@@ -32,12 +32,13 @@ class SystemClock implements Clock {
 
 /// A clock you can lie to, for tests.
 class FakeClock implements Clock {
-  FakeClock({required DateTime wall, Duration monotonic = Duration.zero})
-      : _wall = wall,
-        _monotonic = monotonic;
+  FakeClock({required DateTime wall, Duration monotonic = Duration.zero}) {
+    _wall = wall;
+    _monotonic = monotonic;
+  }
 
-  DateTime _wall;
-  Duration _monotonic;
+  late DateTime _wall;
+  late Duration _monotonic;
 
   @override
   DateTime wall() => _wall;
@@ -152,7 +153,9 @@ ElapsedResolution resolveElapsed({
 /// ever observed. Wall time is monotonic in reality; if we ever see it go backwards,
 /// something was changed by hand.
 class ClockGuard {
-  ClockGuard({DateTime? highWaterMark}) : _highWaterMark = highWaterMark;
+  ClockGuard({DateTime? highWaterMark}) {
+    _highWaterMark = highWaterMark;
+  }
 
   DateTime? _highWaterMark;
 

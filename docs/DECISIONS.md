@@ -5,6 +5,32 @@ why. Newest first.
 
 ---
 
+## 2026-08-12 — D-012: iOS is paused; Android is the shipping platform
+
+**Chosen:** all development continues on Android. The iOS spike, its Swift, and the
+Screen Time findings stay in the repository untouched and unbuilt.
+
+**Rejected:** deleting the iOS work, and continuing both in parallel as D-007 planned.
+
+**Why:** the owner's call, and the evidence supports it. Android's spike works on the
+device today; iOS's has never been compiled, needs an entitlement Apple can decline, and
+on 26.4.1 depends on a Shortcuts automation whose behaviour under a shield is still
+unverified (open question A, still unanswered). Meanwhile the feature the product was
+originally asked for — *"tell me if there's important notifications from my favourite
+persons"* — is Android-only and permanently unavailable on this iPhone (D-008). One
+platform that does everything beats two that each do part of it.
+
+**What this does not change:** the domain layer stays pure Dart with no platform imports
+(D-011). It would be easy to argue that with one platform the abstraction is now dead
+weight, and to start reaching into it from Flutter widgets. Don't. It costs nothing to
+keep, it is the reason the rules are tested at all, and resuming iOS is a decision away.
+
+**Resuming iOS:** `docs/P0_SPIKE.md` is still the entry point and still accurate. The
+cheapest thing that would improve it is an update to iOS 26.5, which activates
+`.openParentalControlsApp` and removes the Shortcuts dependency entirely (D-009).
+
+---
+
 ## 2026-08-12 — D-011: The domain layer is a standalone package, not a folder in the app
 
 **Chosen:** `packages/domain/` is its own pure-Dart package with its own `pubspec.yaml`

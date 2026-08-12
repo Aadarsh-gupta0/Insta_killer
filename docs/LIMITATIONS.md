@@ -2,7 +2,14 @@
 
 Plain language. No hedging. This file ships with the build and is linked from Settings.
 
-Last verified against Apple documentation: **12 August 2026**.
+Last verified: **12 August 2026**.
+
+> **The app currently ships on Android only** (D-012). The iOS sections below are kept
+> because they are accurate and because resuming is a decision away — but nothing on
+> iPhone is being built right now. If you are reading this as a user of the Android
+> build, the sections that apply to you are *"On Android, your phone may switch the
+> block off without telling you"* and *"The block is only as strong as your ability to
+> delete this app"*.
 
 ---
 
