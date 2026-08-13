@@ -21,7 +21,7 @@ class OfficeRules {
     this.schedule = const WeeklySchedule.empty(),
     this.strictMode = true,
     this.grantDuration = defaultGrantDuration,
-    this.blockedAppCount = 0,
+    this.blockedPackages = const {},
     this.enforcementEnabled = false,
   });
 
@@ -40,17 +40,22 @@ class OfficeRules {
   /// Defaults to false so installing the app changes nothing until onboarding says so.
   final bool enforcementEnabled;
 
-  /// Only the count — the tokens themselves are opaque and live on the platform side
-  /// (C-3). It is here because removing an app is a loosening change (FR-25) and the
-  /// cooldown classifier needs something to compare.
-  final int blockedAppCount;
+  /// Which apps are blocked, by package name.
+  ///
+  /// The full set rather than a count, which is a straight win over the iOS design: there,
+  /// `ApplicationToken`s are deliberately opaque (C-3) and the app can never learn what the
+  /// user picked. Android hands us package names, so the Gate can say *which* app it just
+  /// turned away, and the cooldown classifier can tell adding one from removing one.
+  final Set<String> blockedPackages;
+
+  int get blockedAppCount => blockedPackages.length;
 
   OfficeRules copyWith({
     QuotaPolicy? quota,
     WeeklySchedule? schedule,
     bool? strictMode,
     Duration? grantDuration,
-    int? blockedAppCount,
+    Set<String>? blockedPackages,
     bool? enforcementEnabled,
   }) =>
       OfficeRules(
@@ -58,7 +63,7 @@ class OfficeRules {
         schedule: schedule ?? this.schedule,
         strictMode: strictMode ?? this.strictMode,
         grantDuration: grantDuration ?? this.grantDuration,
-        blockedAppCount: blockedAppCount ?? this.blockedAppCount,
+        blockedPackages: blockedPackages ?? this.blockedPackages,
         enforcementEnabled: enforcementEnabled ?? this.enforcementEnabled,
       );
 
@@ -67,7 +72,7 @@ class OfficeRules {
         'schedule': schedule.toJson(),
         'strictMode': strictMode,
         'grantDurationMs': grantDuration.inMilliseconds,
-        'blockedAppCount': blockedAppCount,
+        'blockedPackages': blockedPackages.toList()..sort(),
         'enforcementEnabled': enforcementEnabled,
       };
 
@@ -88,7 +93,9 @@ class OfficeRules {
         grantDuration: json['grantDurationMs'] == null
             ? defaultGrantDuration
             : Duration(milliseconds: json['grantDurationMs']! as int),
-        blockedAppCount: json['blockedAppCount'] as int? ?? 0,
+        blockedPackages: json['blockedPackages'] == null
+            ? const {}
+            : (json['blockedPackages']! as List<Object?>).cast<String>().toSet(),
         enforcementEnabled: json['enforcementEnabled'] as bool? ?? false,
       );
 }

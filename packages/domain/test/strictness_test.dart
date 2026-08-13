@@ -31,15 +31,29 @@ void main() {
     });
 
     test('removing a blocked app loosens', () {
-      final from = base.copyWith(blockedAppCount: 3);
-      expect(classifyChange(from, from.copyWith(blockedAppCount: 2)),
-          ChangeDirection.loosen);
+      final from = base.copyWith(blockedPackages: {'a', 'b', 'c'});
+      expect(
+        classifyChange(from, from.copyWith(blockedPackages: {'a', 'b'})),
+        ChangeDirection.loosen,
+      );
     });
 
     test('adding a blocked app tightens', () {
-      final from = base.copyWith(blockedAppCount: 3);
-      expect(classifyChange(from, from.copyWith(blockedAppCount: 4)),
-          ChangeDirection.tighten);
+      final from = base.copyWith(blockedPackages: {'a'});
+      expect(
+        classifyChange(from, from.copyWith(blockedPackages: {'a', 'b'})),
+        ChangeDirection.tighten,
+      );
+    });
+
+    test('swapping one blocked app for another loosens', () {
+      // The count is unchanged, but an app that was blocked a second ago is not any
+      // more. Comparing counts would have called this neutral.
+      final from = base.copyWith(blockedPackages: {'a'});
+      expect(
+        classifyChange(from, from.copyWith(blockedPackages: {'b'})),
+        ChangeDirection.loosen,
+      );
     });
 
     test('shortening a schedule loosens', () {
@@ -78,7 +92,7 @@ void main() {
     test('a mixed change counts as loosening', () {
       // Blocking one more app while tripling the quota is not a tightening.
       final to = base.copyWith(
-        blockedAppCount: 1,
+        blockedPackages: {'a'},
         quota: const QuotaPolicy(permitsPerDay: 9),
       );
       expect(classifyChange(base, to), ChangeDirection.loosen,

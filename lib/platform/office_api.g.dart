@@ -41,20 +41,16 @@ class Permissions {
   Permissions({
     required this.accessibility,
     required this.notificationAccess,
-    required this.instagramInstalled,
   });
 
   bool accessibility;
 
   bool notificationAccess;
 
-  bool instagramInstalled;
-
   Object encode() {
     return <Object?>[
       accessibility,
       notificationAccess,
-      instagramInstalled,
     ];
   }
 
@@ -63,7 +59,45 @@ class Permissions {
     return Permissions(
       accessibility: result[0]! as bool,
       notificationAccess: result[1]! as bool,
-      instagramInstalled: result[2]! as bool,
+    );
+  }
+}
+
+/// A launchable app on this device, for the Blocklist screen.
+///
+/// Note what iOS could never provide here: a name. `FamilyActivityPicker` returns opaque
+/// tokens by design (C-3), so the iOS build can only ever say "3 apps blocked". Android
+/// gives us the label and the icon, which is why the Blocklist and the Gate can both name
+/// the app they are talking about.
+class InstalledApp {
+  InstalledApp({
+    required this.packageName,
+    required this.label,
+    this.icon,
+  });
+
+  String packageName;
+
+  String label;
+
+  /// PNG bytes, pre-scaled by the platform. Null when the icon could not be rendered —
+  /// the row still works, it just shows initials.
+  Uint8List? icon;
+
+  Object encode() {
+    return <Object?>[
+      packageName,
+      label,
+      icon,
+    ];
+  }
+
+  static InstalledApp decode(Object result) {
+    result as List<Object?>;
+    return InstalledApp(
+      packageName: result[0]! as String,
+      label: result[1]! as String,
+      icon: result[2] as Uint8List?,
     );
   }
 }
@@ -134,8 +168,11 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is Permissions) {
       buffer.putUint8(130);
       writeValue(buffer, value.encode());
-    }    else if (value is NativeState) {
+    }    else if (value is InstalledApp) {
       buffer.putUint8(131);
+      writeValue(buffer, value.encode());
+    }    else if (value is NativeState) {
+      buffer.putUint8(132);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -151,6 +188,8 @@ class _PigeonCodec extends StandardMessageCodec {
       case 130: 
         return Permissions.decode(readValue(buffer)!);
       case 131: 
+        return InstalledApp.decode(readValue(buffer)!);
+      case 132: 
         return NativeState.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -195,6 +234,64 @@ class OfficeHostApi {
       );
     } else {
       return (pigeonVar_replyList[0] as NativeState?)!;
+    }
+  }
+
+  /// Every launchable app, minus our own. Sorted by label.
+  ///
+  /// Slow enough to be worth calling once when the Blocklist opens rather than on every
+  /// build — a few hundred packages, each with an icon to rasterise.
+  Future<List<InstalledApp>> installedApps() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.insta_killer.OfficeHostApi.installedApps$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(null) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as List<Object?>?)!.cast<InstalledApp>();
+    }
+  }
+
+  /// Re-scopes the accessibility service to exactly these packages.
+  ///
+  /// The manifest declares a static list, but the whole point is that the user chooses,
+  /// so the service narrows itself at runtime. Passing an empty list means the watcher
+  /// observes nothing at all, which is the correct reading of "no apps blocked".
+  Future<void> setWatchedPackages(List<String> packageNames) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.insta_killer.OfficeHostApi.setWatchedPackages$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[packageNames]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
     }
   }
 

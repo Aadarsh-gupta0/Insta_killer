@@ -31,7 +31,21 @@ enum LaunchReason {
 class Permissions {
   late bool accessibility;
   late bool notificationAccess;
-  late bool instagramInstalled;
+}
+
+/// A launchable app on this device, for the Blocklist screen.
+///
+/// Note what iOS could never provide here: a name. `FamilyActivityPicker` returns opaque
+/// tokens by design (C-3), so the iOS build can only ever say "3 apps blocked". Android
+/// gives us the label and the icon, which is why the Blocklist and the Gate can both name
+/// the app they are talking about.
+class InstalledApp {
+  late String packageName;
+  late String label;
+
+  /// PNG bytes, pre-scaled by the platform. Null when the icon could not be rendered —
+  /// the row still works, it just shows initials.
+  Uint8List? icon;
 }
 
 /// The little that native owns.
@@ -59,6 +73,19 @@ class NativeState {
 @HostApi()
 abstract class OfficeHostApi {
   NativeState state();
+
+  /// Every launchable app, minus our own. Sorted by label.
+  ///
+  /// Slow enough to be worth calling once when the Blocklist opens rather than on every
+  /// build — a few hundred packages, each with an icon to rasterise.
+  List<InstalledApp> installedApps();
+
+  /// Re-scopes the accessibility service to exactly these packages.
+  ///
+  /// The manifest declares a static list, but the whole point is that the user chooses,
+  /// so the service narrows itself at runtime. Passing an empty list means the watcher
+  /// observes nothing at all, which is the correct reading of "no apps blocked".
+  void setWatchedPackages(List<String> packageNames);
 
   void setBlockingEnabled(bool enabled);
 

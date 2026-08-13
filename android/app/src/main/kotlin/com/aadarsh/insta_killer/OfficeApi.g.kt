@@ -75,23 +75,57 @@ enum class LaunchReason(val raw: Int) {
  */
 data class Permissions (
   val accessibility: Boolean,
-  val notificationAccess: Boolean,
-  val instagramInstalled: Boolean
+  val notificationAccess: Boolean
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): Permissions {
       val accessibility = pigeonVar_list[0] as Boolean
       val notificationAccess = pigeonVar_list[1] as Boolean
-      val instagramInstalled = pigeonVar_list[2] as Boolean
-      return Permissions(accessibility, notificationAccess, instagramInstalled)
+      return Permissions(accessibility, notificationAccess)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
       accessibility,
       notificationAccess,
-      instagramInstalled,
+    )
+  }
+}
+
+/**
+ * A launchable app on this device, for the Blocklist screen.
+ *
+ * Note what iOS could never provide here: a name. `FamilyActivityPicker` returns opaque
+ * tokens by design (C-3), so the iOS build can only ever say "3 apps blocked". Android
+ * gives us the label and the icon, which is why the Blocklist and the Gate can both name
+ * the app they are talking about.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class InstalledApp (
+  val packageName: String,
+  val label: String,
+  /**
+   * PNG bytes, pre-scaled by the platform. Null when the icon could not be rendered —
+   * the row still works, it just shows initials.
+   */
+  val icon: ByteArray? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): InstalledApp {
+      val packageName = pigeonVar_list[0] as String
+      val label = pigeonVar_list[1] as String
+      val icon = pigeonVar_list[2] as ByteArray?
+      return InstalledApp(packageName, label, icon)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      packageName,
+      label,
+      icon,
     )
   }
 }
@@ -156,6 +190,11 @@ private open class OfficeApiPigeonCodec : StandardMessageCodec() {
       }
       131.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
+          InstalledApp.fromList(it)
+        }
+      }
+      132.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
           NativeState.fromList(it)
         }
       }
@@ -172,8 +211,12 @@ private open class OfficeApiPigeonCodec : StandardMessageCodec() {
         stream.write(130)
         writeValue(stream, value.toList())
       }
-      is NativeState -> {
+      is InstalledApp -> {
         stream.write(131)
+        writeValue(stream, value.toList())
+      }
+      is NativeState -> {
+        stream.write(132)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -184,6 +227,21 @@ private open class OfficeApiPigeonCodec : StandardMessageCodec() {
 /** Generated interface from Pigeon that represents a handler of messages from Flutter. */
 interface OfficeHostApi {
   fun state(): NativeState
+  /**
+   * Every launchable app, minus our own. Sorted by label.
+   *
+   * Slow enough to be worth calling once when the Blocklist opens rather than on every
+   * build — a few hundred packages, each with an icon to rasterise.
+   */
+  fun installedApps(): List<InstalledApp>
+  /**
+   * Re-scopes the accessibility service to exactly these packages.
+   *
+   * The manifest declares a static list, but the whole point is that the user chooses,
+   * so the service narrows itself at runtime. Passing an empty list means the watcher
+   * observes nothing at all, which is the correct reading of "no apps blocked".
+   */
+  fun setWatchedPackages(packageNames: List<String>)
   fun setBlockingEnabled(enabled: Boolean)
   /**
    * Suspends blocking until [endsAtEpochMs] and schedules the T-2min and T-0
@@ -219,6 +277,39 @@ interface OfficeHostApi {
           channel.setMessageHandler { _, reply ->
             val wrapped: List<Any?> = try {
               listOf(api.state())
+            } catch (exception: Throwable) {
+              wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.insta_killer.OfficeHostApi.installedApps$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.installedApps())
+            } catch (exception: Throwable) {
+              wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.insta_killer.OfficeHostApi.setWatchedPackages$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val packageNamesArg = args[0] as List<String>
+            val wrapped: List<Any?> = try {
+              api.setWatchedPackages(packageNamesArg)
+              listOf(null)
             } catch (exception: Throwable) {
               wrapError(exception)
             }

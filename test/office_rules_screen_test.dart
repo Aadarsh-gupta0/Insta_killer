@@ -30,7 +30,6 @@ class FakeHost extends OfficeHostApi {
         permissions: Permissions(
           accessibility: accessibility,
           notificationAccess: notificationAccess,
-          instagramInstalled: true,
         ),
         lastWatcherHeartbeatEpochMs: heartbeat,
       );
@@ -41,6 +40,9 @@ class FakeHost extends OfficeHostApi {
 
   @override
   Future<void> setBlockingEnabled(bool enabled) async {}
+
+  @override
+  Future<void> setWatchedPackages(List<String> packageNames) async {}
 }
 
 void main() {

@@ -29,6 +29,18 @@ class ForegroundWatcher : AccessibilityService() {
         private const val TAG = "ForegroundWatcher"
 
         /**
+         * The connected instance, so the app can re-scope the watch list the moment the
+         * user edits the Blocklist rather than at the next service restart.
+         *
+         * A static reference to a Service is normally a leak; this one is cleared in
+         * [onUnbind] and [onDestroy], and the service is a singleton the system owns for
+         * as long as the permission is granted.
+         */
+        @Volatile
+        var instance: ForegroundWatcher? = null
+            private set
+
+        /**
          * Instagram fires several `typeWindowStateChanged` events while it starts. Without
          * this the Gate launches three or four times per open, and `singleTop` alone does
          * not save us because each launch re-runs the four-second pause.
@@ -40,19 +52,54 @@ class ForegroundWatcher : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         OfficeStore(this).watcherHeartbeat = System.currentTimeMillis()
-        Log.d(TAG, "Connected. Watching ${OfficeStore.INSTAGRAM} only.")
+        applyWatchList()
+    }
+
+    /**
+     * Narrows the service to exactly the packages the user picked.
+     *
+     * The manifest's `packageNames` is only a starting value; this is the real one. An
+     * empty selection is left as a single impossible package name rather than null,
+     * because null means *every app on the device* — the opposite of what "nothing is
+     * blocked" should do, and a privacy promise we have no reason to break.
+     */
+    fun applyWatchList() {
+        val watched = OfficeStore(this).watchedPackages
+        serviceInfo = serviceInfo?.apply {
+            packageNames = if (watched.isEmpty()) {
+                arrayOf("com.aadarsh.insta_killer.none")
+            } else {
+                watched.toTypedArray()
+            }
+        }
+        Log.d(TAG, "Watching ${watched.size} package(s)")
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        instance = null
+        return super.onUnbind(intent)
+    }
+
+    override fun onDestroy() {
+        instance = null
+        super.onDestroy()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val packageName = event?.packageName?.toString() ?: return
-        if (packageName != OfficeStore.INSTAGRAM) return
 
         val store = OfficeStore(this)
 
         // Proof of life for the watchdog, written before any early return — a watcher
         // that is alive but not acting must not look dead.
         store.watcherHeartbeat = System.currentTimeMillis()
+
+        // Belt and braces: serviceInfo already filters to the watched set, but a filter
+        // that has not been re-applied since an edit would otherwise gate an app the user
+        // just unblocked.
+        if (packageName !in store.watchedPackages) return
 
         val now = SystemClock.elapsedRealtime()
         if (now - lastTriggerAt < DEBOUNCE_MS) return
@@ -73,6 +120,8 @@ class ForegroundWatcher : AccessibilityService() {
                         Intent.FLAG_ACTIVITY_NO_ANIMATION
                 )
                 putExtra(MainActivity.EXTRA_LAUNCH_REASON, MainActivity.REASON_GATE)
+                // So the Gate can name the app it just turned away.
+                putExtra(MainActivity.EXTRA_BLOCKED_PACKAGE, packageName)
             }
         )
     }

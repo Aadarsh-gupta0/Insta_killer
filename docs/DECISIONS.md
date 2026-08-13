@@ -5,6 +5,45 @@ why. Newest first.
 
 ---
 
+## 2026-08-13 — D-014: Any app, not just Instagram
+
+**Chosen:** the user picks the blocked apps from a list of everything launchable on the
+device. `OfficeRules.blockedPackages` holds the set; the accessibility service re-scopes
+itself to exactly that set at runtime.
+
+**Rejected:** keeping Instagram hardcoded, which is what the spike did and what four
+separate places still assumed — the manifest `<queries>`, the accessibility config's
+`packageNames`, `OfficeStore.INSTAGRAM`, and the watcher's package comparison.
+
+**Why:** the owner asked for it, and the product was always weaker without it. The habit
+is the reflex open, not Instagram specifically; a user who blocks Instagram and then
+reaches for the next infinite feed has been helped with the symptom and not the problem.
+
+**How the empty case is handled, and why it matters:** an accessibility service with
+`packageNames = null` observes *every app the user opens*. That is the natural
+representation of "nothing selected" and it is exactly wrong — it would quietly widen our
+observation at the moment the user has asked for the least. The empty set is therefore
+stored as one impossible package name instead, so "nothing blocked" means the service sees
+nothing at all.
+
+**On the cooldown:** the blocklist is compared as a *set*, not a count. Swapping one app
+for another leaves the count identical while freeing an app that was blocked a moment
+before, and counting would have called that neutral. It is a loosening and it waits.
+
+**What Android gives us here that iOS never could:** package names are readable. The iOS
+design is built around `ApplicationToken`s being deliberately opaque (C-3) — that build
+can only ever say "3 apps blocked" and can never confirm the user picked what they meant
+to. Here the Blocklist shows names and icons, and the Gate can name the app it just turned
+away. If iOS resumes, this screen has no equivalent there and the difference should be
+stated in onboarding rather than papered over.
+
+**Cost:** `<queries>` now declares the MAIN/LAUNCHER intent, so we can see every launchable
+package. That is broader than one hardcoded package and narrower than `QUERY_ALL_PACKAGES`,
+which is both more access than the feature needs and a Play policy problem if this is ever
+distributed.
+
+---
+
 ## 2026-08-13 — D-013: Native holds two numbers; everything else crosses as opaque JSON
 
 **Chosen:** the Pigeon bridge exposes exactly two pieces of typed state that Kotlin acts

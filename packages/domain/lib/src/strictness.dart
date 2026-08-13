@@ -41,7 +41,14 @@ ChangeDirection classifyChange(OfficeRules from, OfficeRules to) {
       moreIsStricter: false);
   compare(from.grantDuration.inSeconds, to.grantDuration.inSeconds,
       moreIsStricter: false);
-  compare(from.blockedAppCount, to.blockedAppCount, moreIsStricter: true);
+  // Compared as sets, not counts. Swapping one blocked app for another leaves the count
+  // identical while freeing an app that was blocked a moment ago, and that is a loosening.
+  if (to.blockedPackages.difference(from.blockedPackages).isNotEmpty) {
+    sawTighten = true;
+  }
+  if (from.blockedPackages.difference(to.blockedPackages).isNotEmpty) {
+    sawLoosen = true;
+  }
   compare(from.schedule.blockedMinutesPerWeek,
       to.schedule.blockedMinutesPerWeek,
       moreIsStricter: true);

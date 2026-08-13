@@ -1,8 +1,8 @@
 # Insta_killer
 
-An intentional-access gate for Instagram. When you open Instagram, Instagram does not
-open — a gate appears, and the only way past is to spend one of a finite number of
-15-minute permits.
+An intentional-access gate for the apps you choose. When you open one, it does not open —
+a gate appears, and the only way past is to spend one of a finite number of 15-minute
+permits.
 
 **Shipping platform: Android.** iOS is paused, not abandoned ([D-012](docs/DECISIONS.md)).
 Test device: OnePlus 12R, Android 16 (OxygenOS 16).
@@ -11,8 +11,8 @@ Test device: OnePlus 12R, Android 16 (OxygenOS 16).
 
 | | Status |
 |---|---|
-| `packages/domain` — the rules | **107 tests, 93%+ coverage.** Analyzer clean. |
-| `lib/` — the Flutter app | **55 tests.** Gate, Front Desk, Office Rules, platform repository. |
+| `packages/domain` — the rules | **108 tests, 93%+ coverage.** Analyzer clean. |
+| `lib/` — the Flutter app | **66 tests.** Gate, Front Desk, Office Rules, Blocklist, platform repository. |
 | `android/` — enforcement + Pigeon bridge | **Verified on device**, 13 Aug 2026. |
 | `ios-spike/` | Written, never compiled. Paused. |
 
@@ -51,6 +51,7 @@ lib/
   design/tokens.dart   the Permit Office: palette, type, spacing, motion
   features/gate/       the reflex interrupt — 4s pause, declaration, reason
   features/home/       Front Desk
+  features/blocklist/  which apps are gated
   features/settings/   Office Rules — the master switch and the cooldown
   platform/            Pigeon bridge + the repository behind it
 
@@ -76,11 +77,12 @@ silently. That is why the app watches its own pulse ([D-010](docs/DECISIONS.md))
 ## How enforcement works
 
 ```
-Instagram opens
+a blocked app opens
       │
 ForegroundWatcher   AccessibilityService — told instantly, and exempt from the
       │             background-activity-launch limits that stop a plain service
-      │             opening a screen
+      │             opening a screen. Scoped at runtime to exactly the apps
+      │             on the blocklist, and to nothing at all when it is empty
       ├── blocking off?     → do nothing
       ├── permit running?   → do nothing      (compares a timestamp, not an alarm)
       └── otherwise         → launch MainActivity with reason=gate

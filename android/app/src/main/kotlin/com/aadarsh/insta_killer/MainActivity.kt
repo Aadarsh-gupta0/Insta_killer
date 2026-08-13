@@ -11,6 +11,7 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         const val EXTRA_LAUNCH_REASON = "launch_reason"
+        const val EXTRA_BLOCKED_PACKAGE = "blocked_package"
         const val REASON_GATE = "gate"
     }
 

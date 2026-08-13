@@ -82,11 +82,16 @@
     </application>
 
     <queries>
-        <!-- Without this, getPackageInfo for Instagram reports "not installed" on
-             Android 11+ even when it plainly is. One package rather than
-             QUERY_ALL_PACKAGES, which is both more access than we need and a policy
-             landmine if this is ever distributed. -->
-        <package android:name="com.instagram.android" />
+        <!-- Every app with a launcher entry, so the Blocklist can offer them. Scoped to
+             LAUNCHER rather than QUERY_ALL_PACKAGES: we only need apps a person can open,
+             which is exactly the set that can be blocked, and it avoids a permission that
+             is both broader than the need and a policy landmine if this is distributed.
+
+             Without this, Android 11+ reports every package as "not installed". -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
 
         <!-- Used by the Flutter engine's ProcessTextPlugin. -->
         <intent>

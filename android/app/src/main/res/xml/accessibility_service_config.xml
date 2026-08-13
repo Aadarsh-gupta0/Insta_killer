@@ -8,13 +8,17 @@
   canRetrieveWindowContent false. We never read screen contents — we only need the package
                            name, which arrives on the event itself. With this false the
                            service cannot inspect the screen even if it wanted to.
-  packageNames             Scoped to one app. Remove the attribute and the service sees
-                           every app the user opens; we deliberately do not want that.
+  packageNames             A starting value only. ForegroundWatcher.applyWatchList()
+                           narrows this at runtime to exactly the apps the user picked,
+                           and to an impossible package name when they have picked none.
+                           Removing the attribute entirely would make the service see
+                           every app opened on the device; we deliberately never do that,
+                           which is why the empty case uses a sentinel rather than null.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="0"
     android:canRetrieveWindowContent="false"
-    android:packageNames="com.instagram.android"
+    android:packageNames="com.aadarsh.insta_killer.none"
     android:description="@string/accessibility_description" />

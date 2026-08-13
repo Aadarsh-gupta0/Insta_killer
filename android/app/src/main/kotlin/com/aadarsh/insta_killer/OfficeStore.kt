@@ -28,10 +28,24 @@ class OfficeStore(context: Context) {
         private const val KEY_BLOCKING = "blocking_enabled"
         private const val KEY_GRANT_ENDS_AT = "grant_ends_at"
         private const val KEY_WATCHER_HEARTBEAT = "watcher_heartbeat"
+        private const val KEY_WATCHED = "watched_packages"
         private const val BLOB_PREFIX = "blob."
 
+        /// Still referenced by the VIP probe, which only reads Instagram's notifications.
+        /// Blocking is no longer limited to it — see [watchedPackages].
         const val INSTAGRAM = "com.instagram.android"
     }
+
+    /**
+     * Which packages the watcher acts on. Chosen by the user, written by Dart.
+     *
+     * Read by [ForegroundWatcher] on connect and pushed to it on change. Stored as a set
+     * rather than a single package because the product is "block the apps I pick", and
+     * hardcoding one was only ever a spike shortcut.
+     */
+    var watchedPackages: Set<String>
+        get() = prefs.getStringSet(KEY_WATCHED, emptySet()) ?: emptySet()
+        set(value) = prefs.edit().putStringSet(KEY_WATCHED, value).apply()
 
     /** Off until onboarding finishes. Installing the app changes nothing on its own. */
     var blockingEnabled: Boolean

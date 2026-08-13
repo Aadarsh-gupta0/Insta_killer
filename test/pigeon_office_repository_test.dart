@@ -10,6 +10,7 @@ class FakeHost extends OfficeHostApi {
   final Map<String, String> blobs = {};
   final List<int> grantsBegun = [];
   final List<bool> blockingPushes = [];
+  final List<List<String>> watchPushes = [];
   int grantsEnded = 0;
 
   bool? get blockingEnabled =>
@@ -31,6 +32,10 @@ class FakeHost extends OfficeHostApi {
   @override
   Future<void> setBlockingEnabled(bool enabled) async =>
       blockingPushes.add(enabled);
+
+  @override
+  Future<void> setWatchedPackages(List<String> packageNames) async =>
+      watchPushes.add(packageNames);
 }
 
 void main() {
@@ -52,7 +57,7 @@ void main() {
         schedule: WeeklySchedule.daily(startHour: 23, endHour: 2),
         strictMode: false,
         grantDuration: const Duration(minutes: 20),
-        blockedAppCount: 2,
+        blockedPackages: {'com.instagram.android', 'com.zhiliaoapp.musically'},
       );
 
       await repo.saveRules(rules);
@@ -63,7 +68,8 @@ void main() {
       expect(restored.schedule, rules.schedule);
       expect(restored.strictMode, isFalse);
       expect(restored.grantDuration, const Duration(minutes: 20));
-      expect(restored.blockedAppCount, 2);
+      expect(restored.blockedPackages,
+          {'com.instagram.android', 'com.zhiliaoapp.musically'});
     });
 
     test('an empty store yields the strict defaults', () async {
@@ -89,6 +95,17 @@ void main() {
 
       await repo.saveRules(const OfficeRules());
       expect(host.blockingEnabled, isFalse);
+    });
+
+    test('saving pushes the watch list to the accessibility service', () async {
+      await repo.saveRules(
+        const OfficeRules(blockedPackages: {'com.instagram.android'}),
+      );
+      expect(host.watchPushes.last, ['com.instagram.android']);
+
+      await repo.saveRules(const OfficeRules());
+      expect(host.watchPushes.last, isEmpty,
+          reason: 'an empty list must reach the service, or it keeps the old scope');
     });
 
     test('loading repairs a native flag that has drifted', () async {

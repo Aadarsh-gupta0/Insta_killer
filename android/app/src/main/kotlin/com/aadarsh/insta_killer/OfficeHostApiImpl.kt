@@ -4,8 +4,13 @@ import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.provider.Settings
 import android.text.TextUtils
+import java.io.ByteArrayOutputStream
 
 /**
  * The Kotlin half of the Pigeon contract.
@@ -31,10 +36,62 @@ class OfficeHostApiImpl(
         permissions = Permissions(
             accessibility = isAccessibilityEnabled(),
             notificationAccess = isNotificationAccessEnabled(),
-            instagramInstalled = isInstagramInstalled(),
         ),
         lastWatcherHeartbeatEpochMs = store.watcherHeartbeat,
     )
+
+    override fun installedApps(): List<InstalledApp> {
+        val pm = context.packageManager
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+
+        return pm.queryIntentActivities(launcher, 0)
+            .asSequence()
+            // Only apps with a launcher entry: the user cannot "open" a service or a
+            // provider, so blocking one would be meaningless.
+            .map { it.activityInfo.applicationInfo }
+            .distinctBy { it.packageName }
+            .filter { it.packageName != context.packageName }
+            .map { info ->
+                InstalledApp(
+                    packageName = info.packageName,
+                    label = pm.getApplicationLabel(info).toString(),
+                    icon = runCatching { encodeIcon(pm.getApplicationIcon(info)) }.getOrNull(),
+                )
+            }
+            .sortedBy { it.label.lowercase() }
+            .toList()
+    }
+
+    /**
+     * Rasterises an icon to a small PNG.
+     *
+     * Capped at 96px because these cross a Pigeon channel in one message: a few hundred
+     * apps at full adaptive-icon resolution is megabytes of binder traffic and a visible
+     * stall when the Blocklist opens.
+     */
+    private fun encodeIcon(drawable: Drawable, size: Int = 96): ByteArray {
+        val bitmap = (drawable as? BitmapDrawable)?.bitmap
+            ?.let { if (it.width <= size) it else Bitmap.createScaledBitmap(it, size, size, true) }
+            ?: Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bmp ->
+                // Adaptive icons are not BitmapDrawables; they have to be drawn.
+                Canvas(bmp).let { canvas ->
+                    drawable.setBounds(0, 0, size, size)
+                    drawable.draw(canvas)
+                }
+            }
+
+        return ByteArrayOutputStream().use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }
+    }
+
+    override fun setWatchedPackages(packageNames: List<String>) {
+        store.watchedPackages = packageNames.toSet()
+        // Push it to the live service so an edit takes effect now rather than at the next
+        // service restart. Null instance is fine — it re-reads the store on connect.
+        ForegroundWatcher.instance?.applyWatchList()
+    }
 
     override fun setBlockingEnabled(enabled: Boolean) {
         store.blockingEnabled = enabled
@@ -85,15 +142,6 @@ class OfficeHostApiImpl(
         } else {
             context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
-    }
-
-    private fun isInstagramInstalled(): Boolean = try {
-        context.packageManager.getPackageInfo(OfficeStore.INSTAGRAM, 0)
-        true
-    } catch (e: Exception) {
-        // Also false when the <queries> element is missing from the manifest on Android
-        // 11+, which looks identical to "not installed". Check the manifest first.
-        false
     }
 
     private fun isAccessibilityEnabled(): Boolean {

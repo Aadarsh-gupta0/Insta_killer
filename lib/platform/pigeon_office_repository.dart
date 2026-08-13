@@ -44,18 +44,22 @@ class PigeonOfficeRepository implements OfficeRepository {
       }
     }
 
-    // Repair on read. The JSON is the source of truth and the native flag is derived, so
-    // if they have drifted — an update, a restore, a half-finished write — this is where
-    // they are put back in step (NFR-2).
+    // Repair on read. The JSON is the source of truth and the native flags are derived
+    // from it, so if they have drifted — an update, a restore, a half-finished write —
+    // this is where they are put back in step (NFR-2).
     await _host.setBlockingEnabled(rules.enforcementEnabled);
+    await _host.setWatchedPackages(rules.blockedPackages.toList());
     return rules;
   }
 
   @override
   Future<void> saveRules(OfficeRules rules) async {
     await _host.write(_rulesKey, jsonEncode(rules.toJson()));
-    // The watcher reads this flag, not the JSON, so it has to be pushed separately.
+    // The watcher reads these, not the JSON, so they have to be pushed separately.
+    // setWatchedPackages also re-scopes the running accessibility service, so an edit
+    // takes effect immediately rather than at the next service restart.
     await _host.setBlockingEnabled(rules.enforcementEnabled);
+    await _host.setWatchedPackages(rules.blockedPackages.toList());
   }
 
   @override

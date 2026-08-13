@@ -9,6 +9,7 @@ import '../../design/ledger_scaffold.dart';
 import '../../design/office_button.dart';
 import '../../design/tokens.dart';
 import '../../platform/office_api.g.dart';
+import '../blocklist/blocklist_screen.dart';
 
 /// Screen 9 — Office Rules.
 ///
@@ -172,19 +173,41 @@ class _OfficeRulesScreenState extends ConsumerState<OfficeRulesScreen>
               onGrant: () =>
                   ref.read(hostApiProvider).openNotificationAccessSettings(),
             ),
-            LedgerRow(
-              label: 'Instagram installed',
-              value: native.permissions.instagramInstalled ? 'yes' : 'no',
-              valueColor: native.permissions.instagramInstalled
-                  ? Palette.ink
-                  : Palette.stamp,
-            ),
             _WatchdogRow(
               heartbeatEpochMs: native.lastWatcherHeartbeatEpochMs,
               now: ref.read(clockProvider).wall(),
               enforcing: rules.enforcementEnabled,
             ),
           ],
+
+          const SizedBox(height: Space.xl),
+          Text('BLOCKED APPS', style: TextStyles.eyebrow),
+          const SizedBox(height: Space.sm),
+          const Hairline(),
+          LedgerRow(
+            label: 'Apps on the list',
+            value: '${rules.blockedAppCount}',
+            valueColor:
+                rules.blockedAppCount == 0 ? Palette.stamp : Palette.ink,
+          ),
+          if (rules.blockedAppCount == 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: Space.sm),
+              child: Text(
+                'Nothing is on the list, so nothing will be gated even with '
+                'blocking switched on.',
+                style: TextStyles.caption,
+              ),
+            ),
+          const SizedBox(height: Space.sm),
+          OfficeButton(
+            label: 'Edit the list',
+            onPressed: () => Navigator.of(context).push(
+              PageRouteBuilder<void>(
+                pageBuilder: (context, _, _) => const BlocklistScreen(),
+              ),
+            ),
+          ),
 
           const SizedBox(height: Space.xl),
           Text('PERMITS', style: TextStyles.eyebrow),
