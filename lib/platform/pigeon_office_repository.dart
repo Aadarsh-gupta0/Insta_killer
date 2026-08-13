@@ -26,6 +26,7 @@ class PigeonOfficeRepository implements OfficeRepository {
   static const _markKey = 'clock.mark';
   static const _declarationKey = 'declaration';
   static const _pendingKey = 'pending';
+  static const _signatureKey = 'signature';
 
   @override
   Future<OfficeRules> loadRules() async {
@@ -151,4 +152,14 @@ class PigeonOfficeRepository implements OfficeRepository {
         _pendingKey,
         change == null ? '' : jsonEncode(change.toJson()),
       );
+
+  @override
+  Future<String?> loadSignature() async {
+    final raw = await _host.read(_signatureKey);
+    return (raw == null || raw.isEmpty) ? null : raw;
+  }
+
+  @override
+  Future<void> saveSignature(String encoded) =>
+      _host.write(_signatureKey, encoded);
 }

@@ -38,6 +38,12 @@ abstract interface class OfficeRepository {
   Future<PendingChange?> loadPendingChange();
 
   Future<void> savePendingChange(PendingChange? change);
+
+  /// The drawn half of FR-24, as encoded strokes. Ceremony, not evidence — nothing
+  /// verifies it, and nothing should imply that it does.
+  Future<String?> loadSignature();
+
+  Future<void> saveSignature(String encoded);
 }
 
 /// In-memory, for tests and for running the UI before the platform layer lands.
@@ -64,6 +70,7 @@ class InMemoryOfficeRepository implements OfficeRepository {
   DateTime? _highWaterMark;
   String? _declaration;
   PendingChange? _pending;
+  String? _signature;
 
   @override
   Future<OfficeRules> loadRules() async => _rules;
@@ -102,4 +109,10 @@ class InMemoryOfficeRepository implements OfficeRepository {
   @override
   Future<void> savePendingChange(PendingChange? change) async =>
       _pending = change;
+
+  @override
+  Future<String?> loadSignature() async => _signature;
+
+  @override
+  Future<void> saveSignature(String encoded) async => _signature = encoded;
 }
