@@ -18,6 +18,12 @@ dependencies:
   # Named in the SRS §2.4 as the state solution, so not a new decision.
   flutter_riverpod: ^2.6.1
 
+  # HMAC-SHA256 for the Guardian's approval codes. Dart-team maintained, pure Dart, no
+  # transitive weight. Hand-rolling SHA-256 was the alternative and is exactly the kind of
+  # thing not to hand-roll. Kept out of packages/domain so the rules stay dependency-free
+  # — the domain takes a CodeSigner and never learns which algorithm signs.
+  crypto: ^3.0.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

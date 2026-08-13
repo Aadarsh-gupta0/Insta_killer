@@ -11,8 +11,8 @@ Test device: OnePlus 12R, Android 16 (OxygenOS 16).
 
 | | Status |
 |---|---|
-| `packages/domain` — the rules | **108 tests, 93%+ coverage.** Analyzer clean. |
-| `lib/` — the Flutter app | **68 tests.** Gate, Front Desk, Office Rules, Blocklist, platform repository. |
+| `packages/domain` — the rules | **124 tests, 93%+ coverage.** Analyzer clean. |
+| `lib/` — the Flutter app | **87 tests.** Gate, Front Desk, Office Rules, Blocklist, Guardian, platform repository. |
 | `android/` — enforcement + Pigeon bridge | **Verified on device**, 13 Aug 2026. |
 | `ios-spike/` | Written, never compiled. Paused. |
 
@@ -53,6 +53,7 @@ lib/
   features/gate/       the reflex interrupt — 4s pause, declaration, reason
   features/home/       Front Desk
   features/blocklist/  which apps are gated
+  features/guardian/   FR-27 — pairing and challenge/response approval
   features/settings/   Office Rules — the master switch and the cooldown
   platform/            Pigeon bridge + the repository behind it
 
@@ -111,9 +112,11 @@ quota cannot be tempted to check it ([D-013](docs/DECISIONS.md)).
 
 ## Next
 
-1. Onboarding — the permission ladder and the signed declaration (FR-24). The Gate
+1. Device Admin — so the app cannot be uninstalled without the Guardian. The other half
+   of what was asked for, and the one that closes the real hole (FR-28).
+2. Onboarding — the permission ladder and the signed declaration (FR-24). The Gate
    already displays the declaration, so until this exists that part of it is blank.
-2. Remaining screens: Hours (schedules), The Record (insights), VIPs.
-3. Surface the D-010 watchdog on the Front Desk, not only in Office Rules.
-4. The multi-day OxygenOS survival check — Q5 in
+3. Remaining screens: Hours (schedules), The Record (insights), VIPs.
+4. Surface the D-010 watchdog on the Front Desk, not only in Office Rules.
+5. The multi-day OxygenOS survival check — Q5 in
    [`docs/P0_SPIKE_ANDROID.md`](docs/P0_SPIKE_ANDROID.md).

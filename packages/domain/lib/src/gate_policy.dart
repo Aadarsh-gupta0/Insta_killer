@@ -23,6 +23,7 @@ class OfficeRules {
     this.grantDuration = defaultGrantDuration,
     this.blockedPackages = const {},
     this.enforcementEnabled = false,
+    this.guardianPaired = false,
   });
 
   final QuotaPolicy quota;
@@ -50,6 +51,13 @@ class OfficeRules {
 
   int get blockedAppCount => blockedPackages.length;
 
+  /// FR-27 — whether a Guardian currently has to agree to loosenings.
+  ///
+  /// Only the flag lives here. The pairing's name and the shared secret are stored
+  /// separately, so the secret is never inside an object that gets serialised into the
+  /// settings blob or written to the event log.
+  final bool guardianPaired;
+
   OfficeRules copyWith({
     QuotaPolicy? quota,
     WeeklySchedule? schedule,
@@ -57,6 +65,7 @@ class OfficeRules {
     Duration? grantDuration,
     Set<String>? blockedPackages,
     bool? enforcementEnabled,
+    bool? guardianPaired,
   }) =>
       OfficeRules(
         quota: quota ?? this.quota,
@@ -65,6 +74,7 @@ class OfficeRules {
         grantDuration: grantDuration ?? this.grantDuration,
         blockedPackages: blockedPackages ?? this.blockedPackages,
         enforcementEnabled: enforcementEnabled ?? this.enforcementEnabled,
+        guardianPaired: guardianPaired ?? this.guardianPaired,
       );
 
   Map<String, Object?> toJson() => {
@@ -74,6 +84,7 @@ class OfficeRules {
         'grantDurationMs': grantDuration.inMilliseconds,
         'blockedPackages': blockedPackages.toList()..sort(),
         'enforcementEnabled': enforcementEnabled,
+        'guardianPaired': guardianPaired,
       };
 
   /// Missing keys fall back to the stricter default rather than throwing.
@@ -97,6 +108,7 @@ class OfficeRules {
             ? const {}
             : (json['blockedPackages']! as List<Object?>).cast<String>().toSet(),
         enforcementEnabled: json['enforcementEnabled'] as bool? ?? false,
+        guardianPaired: json['guardianPaired'] as bool? ?? false,
       );
 }
 

@@ -8,6 +8,7 @@ library;
 export 'src/clock.dart';
 export 'src/event.dart';
 export 'src/gate_policy.dart';
+export 'src/guardian.dart';
 export 'src/insights.dart';
 export 'src/permit.dart';
 export 'src/quota.dart';

@@ -5,6 +5,56 @@ why. Newest first.
 
 ---
 
+## 2026-08-13 — D-015: The Guardian approves by challenge and response, with no server
+
+**Chosen:** the two phones share one secret, established once by copying a twenty-character
+code. To loosen anything, your phone shows a six-digit challenge; the Guardian's phone
+turns it into a six-digit response; you type it back. The codes travel over whatever
+messaging you already use.
+
+**Rejected: a backend with push notifications**, which is what was asked for. Not on
+capability grounds — it is buildable — but because it makes the block depend on a server
+that has to keep running and keep being paid for. When it is down, you cannot loosen
+anything; if it is ever abandoned, the Guardian feature dies with it and the app has to
+know how to degrade anyway. Told the owner plainly rather than quietly substituting.
+
+**Rejected: public-key signing**, which would remove this design's main weakness. It does
+not fit the shape: a signature cannot be truncated to six readable digits and still be
+verifiable, so the Guardian would have to be physically present to show a QR code — which
+is the one thing "approve from their phone" is supposed to avoid.
+
+**The ceiling, stated plainly:** both phones hold the same secret, because yours has to
+*verify* the response and cannot without it. Somebody with developer tools and a rooted
+device could read it out and generate their own codes. That is not the adversary this is
+for. The adversary is the same person at 1am wanting the quota raised now, and extracting
+a key is not something that happens in a weak moment. It is in LIMITATIONS.md, not hidden.
+
+**Approval does not replace the wait.** With a Guardian paired a loosening needs *both* the
+24-hour cooldown and the code. FR-27 says loosening "requires" the Guardian's code; it does
+not say the code buys you out of the cooldown, and making it a fast path would turn the
+Guardian into a way to go quicker — the opposite of the point.
+
+**A deliberate escape hatch.** Removing the Guardian is itself a loosening and needs their
+approval like anything else, which means a Guardian who loses their phone or stops
+answering could lock the settings permanently, with uninstalling as the only way out. So an
+unapproved *unpair* — and only an unpair — goes through on its own after seven days. It
+cannot be used to shortcut an ordinary loosening, because those still need the code
+outright.
+
+**A conflict with the SRS, flagged rather than buried.** §2.3 says the Guardian "must never
+need the app installed". This design requires it, because computing a response requires the
+algorithm. The owner asked for approval from the Guardian's phone specifically, and a
+direct instruction outranks the spec — but the spec's version is still buildable if
+preferred: a printed sheet of one-time codes, each consumed once, no app on their side.
+Offered, not assumed.
+
+**A bug this turned up:** a queued change stores a full snapshot of the rules as they were
+when it was requested, so anything applied in between was silently reverted when the queued
+one landed. Applying an immediate change now discards any queued one. What gets dropped is
+always a loosening, so the resolution is the strict one.
+
+---
+
 ## 2026-08-13 — D-014: Any app, not just Instagram
 
 **Chosen:** the user picks the blocked apps from a list of everything launchable on the

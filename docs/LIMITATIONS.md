@@ -103,6 +103,28 @@ OnePlus is unusually aggressive about this, and is known to quietly undo the
 
 Re-check those settings after any OxygenOS update. They get reset.
 
+## What the Guardian actually protects against
+
+If you pair a Guardian, loosening any rule needs both the 24-hour wait and a six-digit
+code only they can produce. That is real friction and it works on the person it is meant
+to work on — you, later, wanting the quota raised now.
+
+It is not proof against you specifically, and it would be dishonest to say otherwise.
+Both phones hold the same shared code, because your phone has to check their answer and
+cannot do that without it. Somebody willing to root the phone and read the app's storage
+could pull it out and generate their own approvals. That takes deliberate effort with
+developer tools — which is exactly the kind of effort a weak moment does not involve — but
+it is possible, and you should know it is.
+
+Two other things worth knowing:
+
+- **The Guardian needs this app on their phone** to work out the codes. They need no
+  account and nothing is sent anywhere, but they do need the app.
+- **If they vanish, you are not trapped.** Removing a Guardian needs their approval like
+  any other loosening, so a Guardian who loses their phone or stops replying could
+  otherwise lock your settings forever. An unapproved removal therefore goes through on
+  its own after seven days. Nothing else does.
+
 ## The block is only as strong as your ability to delete this app
 
 Deleting Insta_killer removes its shields. There is no way around that. Anything we

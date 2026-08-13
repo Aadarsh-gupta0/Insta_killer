@@ -61,6 +61,16 @@ ChangeDirection classifyChange(OfficeRules from, OfficeRules to) {
     }
   }
 
+  // Pairing a Guardian tightens; removing one loosens. Note this is the *pairing*, not
+  // their approval — approval is checked separately, when the change comes due.
+  if (from.guardianPaired != to.guardianPaired) {
+    if (to.guardianPaired) {
+      sawTighten = true;
+    } else {
+      sawLoosen = true;
+    }
+  }
+
   // The master switch. Turning enforcement on is the whole point and applies at once;
   // turning it off is the largest loosening there is and waits like any other.
   if (from.enforcementEnabled != to.enforcementEnabled) {

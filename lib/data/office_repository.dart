@@ -44,6 +44,30 @@ abstract interface class OfficeRepository {
   Future<String?> loadSignature();
 
   Future<void> saveSignature(String encoded);
+
+  /// FR-27 — the Guardian's shared secret.
+  ///
+  /// Stored on its own, never inside the rules blob: the rules get serialised into the
+  /// event log and passed around inside PendingChange objects, and a secret should not
+  /// travel wherever those go.
+  Future<String?> loadGuardianSecret();
+
+  Future<void> saveGuardianSecret(String? secret);
+
+  Future<GuardianPairing?> loadGuardianPairing();
+
+  Future<void> saveGuardianPairing(GuardianPairing? pairing);
+
+  /// The outstanding "please agree to this", if one has been raised.
+  Future<ApprovalRequest?> loadApprovalRequest();
+
+  Future<void> saveApprovalRequest(ApprovalRequest? request);
+
+  /// Whether the Guardian has agreed to the queued change. Cleared whenever the queued
+  /// change is replaced, so agreement never carries over to a different request.
+  Future<bool> loadApprovalGranted();
+
+  Future<void> saveApprovalGranted(bool granted);
 }
 
 /// In-memory, for tests and for running the UI before the platform layer lands.
@@ -57,11 +81,19 @@ class InMemoryOfficeRepository implements OfficeRepository {
     Permit? activePermit,
     String? declaration,
     PendingChange? pendingChange,
+    String? guardianSecret,
+    GuardianPairing? guardianPairing,
+    ApprovalRequest? approvalRequest,
+    bool approvalGranted = false,
   })  : _rules = rules ?? const OfficeRules(),
         _events = [...?events] {
     _activePermit = activePermit;
     _declaration = declaration;
     _pending = pendingChange;
+    _guardianSecret = guardianSecret;
+    _pairing = guardianPairing;
+    _approvalRequest = approvalRequest;
+    _approvalGranted = approvalGranted;
   }
 
   OfficeRules _rules;
@@ -71,6 +103,10 @@ class InMemoryOfficeRepository implements OfficeRepository {
   String? _declaration;
   PendingChange? _pending;
   String? _signature;
+  String? _guardianSecret;
+  GuardianPairing? _pairing;
+  ApprovalRequest? _approvalRequest;
+  bool _approvalGranted = false;
 
   @override
   Future<OfficeRules> loadRules() async => _rules;
@@ -115,4 +151,32 @@ class InMemoryOfficeRepository implements OfficeRepository {
 
   @override
   Future<void> saveSignature(String encoded) async => _signature = encoded;
+
+  @override
+  Future<String?> loadGuardianSecret() async => _guardianSecret;
+
+  @override
+  Future<void> saveGuardianSecret(String? secret) async =>
+      _guardianSecret = secret;
+
+  @override
+  Future<GuardianPairing?> loadGuardianPairing() async => _pairing;
+
+  @override
+  Future<void> saveGuardianPairing(GuardianPairing? pairing) async =>
+      _pairing = pairing;
+
+  @override
+  Future<ApprovalRequest?> loadApprovalRequest() async => _approvalRequest;
+
+  @override
+  Future<void> saveApprovalRequest(ApprovalRequest? request) async =>
+      _approvalRequest = request;
+
+  @override
+  Future<bool> loadApprovalGranted() async => _approvalGranted;
+
+  @override
+  Future<void> saveApprovalGranted(bool granted) async =>
+      _approvalGranted = granted;
 }

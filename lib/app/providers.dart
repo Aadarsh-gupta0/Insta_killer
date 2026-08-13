@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:insta_killer_domain/insta_killer_domain.dart';
 
+import '../data/guardian_codes.dart';
 import '../data/office_repository.dart';
 import '../platform/office_api.g.dart';
 
@@ -47,6 +48,9 @@ class OfficeState {
     required this.declaration,
     required this.clockGuard,
     required this.pendingChange,
+    required this.guardian,
+    required this.approvalRequest,
+    required this.approvalGranted,
   });
 
   final OfficeRules rules;
@@ -58,6 +62,14 @@ class OfficeState {
   /// FR-25 — a loosening waiting out its 24 hours, if any.
   final PendingChange? pendingChange;
 
+  /// FR-27 — the paired Guardian, if there is one.
+  final GuardianPairing? guardian;
+
+  final ApprovalRequest? approvalRequest;
+  final bool approvalGranted;
+
+  bool get guardianPaired => guardian != null;
+
   OfficeState copyWith({
     OfficeRules? rules,
     List<Event>? events,
@@ -66,6 +78,11 @@ class OfficeState {
     String? declaration,
     PendingChange? pendingChange,
     bool clearPendingChange = false,
+    GuardianPairing? guardian,
+    bool clearGuardian = false,
+    ApprovalRequest? approvalRequest,
+    bool clearApprovalRequest = false,
+    bool? approvalGranted,
   }) =>
       OfficeState(
         rules: rules ?? this.rules,
@@ -76,6 +93,11 @@ class OfficeState {
         clockGuard: clockGuard,
         pendingChange:
             clearPendingChange ? null : (pendingChange ?? this.pendingChange),
+        guardian: clearGuardian ? null : (guardian ?? this.guardian),
+        approvalRequest: clearApprovalRequest
+            ? null
+            : (approvalRequest ?? this.approvalRequest),
+        approvalGranted: approvalGranted ?? this.approvalGranted,
       );
 }
 
@@ -85,6 +107,7 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
   Clock get _clock => ref.read(clockProvider);
 
   static const _strictness = StrictnessPolicy();
+  static const _guardians = GuardianPolicy();
 
   @override
   Future<OfficeState> build() async {
@@ -94,17 +117,27 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
     final mark = await _repo.loadClockHighWaterMark();
     final declaration = await _repo.loadDeclaration();
     var pending = await _repo.loadPendingChange();
+    final guardian = await _repo.loadGuardianPairing();
+    var approvalRequest = await _repo.loadApprovalRequest();
+    var approvalGranted = await _repo.loadApprovalGranted();
 
     // A cooldown that only elapses while the app is open would be no cooldown at all, so
     // a change that came due while we were closed is applied here, on the next start.
-    if (pending != null) {
-      final due = _strictness.applyIfDue(pending, _clock.wall());
-      if (due != null) {
-        rules = due;
-        pending = null;
-        await _repo.saveRules(due);
-        await _repo.savePendingChange(null);
-      }
+    if (pending != null &&
+        _guardians.canApply(
+          change: pending,
+          now: _clock.wall(),
+          paired: guardian != null,
+          approved: approvalGranted,
+        )) {
+      rules = pending.resulting;
+      await _repo.saveRules(rules);
+      await _repo.savePendingChange(null);
+      await _repo.saveApprovalRequest(null);
+      await _repo.saveApprovalGranted(false);
+      pending = null;
+      approvalRequest = null;
+      approvalGranted = false;
     }
 
     return OfficeState(
@@ -114,6 +147,9 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
       declaration: declaration,
       clockGuard: ClockGuard(highWaterMark: mark),
       pendingChange: pending,
+      guardian: guardian,
+      approvalRequest: approvalRequest,
+      approvalGranted: approvalGranted,
     );
   }
 
@@ -146,18 +182,41 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
     switch (outcome) {
       case ChangeApplied(:final rules):
         await _repo.saveRules(rules);
+
+        // A queued change carries a full snapshot of the rules as they were when it was
+        // requested, so anything applied since would be silently reverted the moment it
+        // lands — tighten the quota today and a week-old queued loosening undoes it
+        // along with everything else it captured. Discarding the queued one is the
+        // strict resolution: what gets dropped is always a loosening.
+        final hadPending = current.pendingChange != null;
+        if (hadPending) {
+          await _repo.savePendingChange(null);
+          await _repo.saveApprovalRequest(null);
+          await _repo.saveApprovalGranted(false);
+        }
+
         state = AsyncData(current.copyWith(
           rules: rules,
           events: [...current.events, event],
+          clearPendingChange: hadPending,
+          clearApprovalRequest: hadPending,
+          approvalGranted: false,
         ));
 
       case ChangeQueued(:final pending):
         // One at a time. Replacing rather than queueing behind the existing one, so the
         // countdown on screen always refers to the change the user just asked for.
+        //
+        // Any approval already given is discarded with the old request. A Guardian who
+        // agreed to "quota to 4" has not agreed to whatever replaced it.
         await _repo.savePendingChange(pending);
+        await _repo.saveApprovalRequest(null);
+        await _repo.saveApprovalGranted(false);
         state = AsyncData(current.copyWith(
           pendingChange: pending,
           events: [...current.events, event],
+          clearApprovalRequest: true,
+          approvalGranted: false,
         ));
     }
 
@@ -178,11 +237,115 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
     );
     await _repo.append(event);
     await _repo.savePendingChange(null);
+    await _repo.saveApprovalRequest(null);
+    await _repo.saveApprovalGranted(false);
     state = AsyncData(current.copyWith(
       events: [...current.events, event],
       clearPendingChange: true,
+      clearApprovalRequest: true,
+      approvalGranted: false,
     ));
   }
+
+  // --- FR-27, the Guardian ------------------------------------------------------
+
+  /// Pairs a Guardian. A tightening, so it lands immediately.
+  Future<void> pairGuardian({
+    required String name,
+    required String secret,
+  }) async {
+    final current = await future;
+
+    await _repo.saveGuardianSecret(normaliseSecret(secret));
+    await _repo.saveGuardianPairing(
+      GuardianPairing(name: name.trim(), pairedAt: _clock.wall()),
+    );
+
+    final outcome = _strictness.request(
+      from: current.rules,
+      to: current.rules.copyWith(guardianPaired: true),
+      now: _clock.wall(),
+      description: 'guardian paired',
+    );
+    // Pairing classifies as a tightening, so this is always ChangeApplied. Going through
+    // the policy anyway keeps one path for every rules change rather than a special case
+    // that could drift.
+    if (outcome case ChangeApplied(:final rules)) {
+      await _repo.saveRules(rules);
+      state = AsyncData(current.copyWith(
+        rules: rules,
+        guardian: GuardianPairing(name: name.trim(), pairedAt: _clock.wall()),
+      ));
+    }
+  }
+
+  /// Raises the challenge for the queued change. Idempotent — asking twice does not
+  /// invalidate a code the Guardian is already working on.
+  Future<ApprovalRequest?> requestApproval() async {
+    final current = await future;
+    final pending = current.pendingChange;
+    if (pending == null || !current.guardianPaired) return null;
+
+    final existing = current.approvalRequest;
+    if (existing != null &&
+        existing.changeId == pending.id &&
+        !existing.isExpired(_clock.wall())) {
+      return existing;
+    }
+
+    final request = _guardians.challengeFor(
+      change: pending,
+      now: _clock.wall(),
+      digits: generateChallenge,
+    );
+    await _repo.saveApprovalRequest(request);
+    state = AsyncData(current.copyWith(approvalRequest: request));
+    return request;
+  }
+
+  /// Checks what the Guardian read back.
+  Future<ApprovalVerdict> submitApproval(String response) async {
+    final current = await future;
+    final pending = current.pendingChange;
+    final request = current.approvalRequest;
+    final secret = await _repo.loadGuardianSecret();
+
+    if (pending == null || request == null || secret == null) {
+      return ApprovalVerdict.staleRequest;
+    }
+
+    final verdict = _guardians.verify(
+      request: request,
+      change: pending,
+      response: response,
+      now: _clock.wall(),
+      signer: HmacCodeSigner(secret),
+    );
+
+    if (verdict != ApprovalVerdict.accepted) return verdict;
+
+    final event = Event(
+      at: _clock.wall(),
+      kind: EventKind.settingChanged,
+      detail: 'guardian approved: ${pending.description}',
+    );
+    await _repo.append(event);
+    await _repo.saveApprovalGranted(true);
+    state = AsyncData(current.copyWith(
+      approvalGranted: true,
+      events: [...current.events, event],
+    ));
+
+    // The change may already be past its cooldown and waiting only on this.
+    await reconcile();
+    return verdict;
+  }
+
+  /// What the Guardian's own phone computes. Used only in Guardian mode.
+  String? answerChallenge(String challenge, String secret) =>
+      challenge.trim().length == 6
+          ? HmacCodeSigner(normaliseSecret(secret)).sign(challenge)
+          : null;
 
   /// FR-7 — every launch attempt is recorded, whether or not it becomes a permit.
   ///
@@ -268,16 +431,27 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
   Future<void> reconcile() async {
     var current = await future;
 
-    // The cooldown runs on wall time, not on how long the app was open.
+    // The cooldown runs on wall time, not on how long the app was open — and with a
+    // Guardian paired it also needs their agreement (FR-27).
     final pending = current.pendingChange;
-    if (pending != null) {
-      final due = _strictness.applyIfDue(pending, _clock.wall());
-      if (due != null) {
-        await _repo.saveRules(due);
-        await _repo.savePendingChange(null);
-        current = current.copyWith(rules: due, clearPendingChange: true);
-        state = AsyncData(current);
-      }
+    if (pending != null &&
+        _guardians.canApply(
+          change: pending,
+          now: _clock.wall(),
+          paired: current.guardianPaired,
+          approved: current.approvalGranted,
+        )) {
+      await _repo.saveRules(pending.resulting);
+      await _repo.savePendingChange(null);
+      await _repo.saveApprovalRequest(null);
+      await _repo.saveApprovalGranted(false);
+      current = current.copyWith(
+        rules: pending.resulting,
+        clearPendingChange: true,
+        clearApprovalRequest: true,
+        approvalGranted: false,
+      );
+      state = AsyncData(current);
     }
 
     final permit = current.activePermit;

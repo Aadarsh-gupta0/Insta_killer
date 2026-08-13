@@ -10,6 +10,7 @@ import '../../design/office_button.dart';
 import '../../design/tokens.dart';
 import '../../platform/office_api.g.dart';
 import '../blocklist/blocklist_screen.dart';
+import '../guardian/guardian_screen.dart';
 
 /// Screen 9 — Office Rules.
 ///
@@ -272,6 +273,34 @@ class _OfficeRulesScreenState extends ConsumerState<OfficeRulesScreen>
             onPressed: () => _request(
               rules.copyWith(strictMode: !rules.strictMode),
               rules.strictMode ? 'strict mode off' : 'strict mode on',
+            ),
+          ),
+
+          const SizedBox(height: Space.xl),
+          Text('GUARDIAN', style: TextStyles.eyebrow),
+          const SizedBox(height: Space.sm),
+          const Hairline(),
+          LedgerRow(
+            label: 'Paired',
+            value: office.guardian?.name ?? 'nobody',
+            valueColor: office.guardianPaired ? Palette.seal : Palette.ink,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: Space.sm),
+            child: Text(
+              office.guardianPaired
+                  ? 'Loosening waits out its cooldown and needs their code.'
+                  : 'Without one, the cooldown is the only thing between you '
+                      'and a looser rule.',
+              style: TextStyles.caption,
+            ),
+          ),
+          OfficeButton(
+            label: office.guardianPaired ? 'Guardian' : 'Pair a guardian',
+            onPressed: () => Navigator.of(context).push(
+              PageRouteBuilder<void>(
+                pageBuilder: (context, _, _) => const GuardianScreen(),
+              ),
             ),
           ),
 

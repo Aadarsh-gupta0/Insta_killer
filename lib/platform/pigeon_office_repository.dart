@@ -27,6 +27,10 @@ class PigeonOfficeRepository implements OfficeRepository {
   static const _declarationKey = 'declaration';
   static const _pendingKey = 'pending';
   static const _signatureKey = 'signature';
+  static const _guardianSecretKey = 'guardian.secret';
+  static const _guardianPairingKey = 'guardian.pairing';
+  static const _approvalKey = 'guardian.approval';
+  static const _approvalGrantedKey = 'guardian.approved';
 
   @override
   Future<OfficeRules> loadRules() async {
@@ -166,4 +170,58 @@ class PigeonOfficeRepository implements OfficeRepository {
   @override
   Future<void> saveSignature(String encoded) =>
       _host.write(_signatureKey, encoded);
+
+  @override
+  Future<String?> loadGuardianSecret() async {
+    final raw = await _host.read(_guardianSecretKey);
+    return (raw == null || raw.isEmpty) ? null : raw;
+  }
+
+  @override
+  Future<void> saveGuardianSecret(String? secret) =>
+      _host.write(_guardianSecretKey, secret ?? '');
+
+  @override
+  Future<GuardianPairing?> loadGuardianPairing() async {
+    final raw = await _host.read(_guardianPairingKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return GuardianPairing.fromJson(jsonDecode(raw) as Map<String, Object?>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveGuardianPairing(GuardianPairing? pairing) => _host.write(
+        _guardianPairingKey,
+        pairing == null ? '' : jsonEncode(pairing.toJson()),
+      );
+
+  @override
+  Future<ApprovalRequest?> loadApprovalRequest() async {
+    final raw = await _host.read(_approvalKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return ApprovalRequest.fromJson(jsonDecode(raw) as Map<String, Object?>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveApprovalRequest(ApprovalRequest? request) => _host.write(
+        _approvalKey,
+        request == null ? '' : jsonEncode(request.toJson()),
+      );
+
+  @override
+  Future<bool> loadApprovalGranted() async =>
+      (await _host.read(_approvalGrantedKey)) == 'yes';
+
+  /// Stored as a word rather than a bool because the bridge only carries strings, and
+  /// anything that is not exactly "yes" reads as not approved — the strict direction.
+  @override
+  Future<void> saveApprovalGranted(bool granted) =>
+      _host.write(_approvalGrantedKey, granted ? 'yes' : '');
 }
