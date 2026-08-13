@@ -13,8 +13,7 @@ Test device: OnePlus 12R, Android 16 (OxygenOS 16).
 |---|---|
 | `packages/domain` — the rules | **107 tests, 93%+ coverage.** Analyzer clean. |
 | `lib/` — the Flutter app | **55 tests.** Gate, Front Desk, Office Rules, platform repository. |
-| `android/` — enforcement + Pigeon bridge | Written, **never compiled.** Awaiting first device run. |
-| `android-spike/` | Superseded by `android/`. Kept until the merged build is verified. |
+| `android/` — enforcement + Pigeon bridge | **Verified on device**, 13 Aug 2026. |
 | `ios-spike/` | Written, never compiled. Paused. |
 
 ```
@@ -23,9 +22,9 @@ flutter test        # at the root — the screens
 flutter analyze     # clean
 ```
 
-Nothing in this repository has been compiled for Android. The build environment has no
-Android SDK (`dl.google.com` is blocked by network policy), so Dart and Flutter tests are
-the full extent of what has been verified here. The Kotlin is hand-checked.
+The build environment has no Android SDK (`dl.google.com` is blocked by network policy),
+so nothing here is compiled by CI — the Dart and Flutter tests are the full extent of what
+is verified automatically. The Kotlin is verified by running it on the phone.
 
 ## Read these first
 
@@ -55,8 +54,7 @@ lib/
   features/settings/   Office Rules — the master switch and the cooldown
   platform/            Pigeon bridge + the repository behind it
 
-android/               the Flutter app's Android project
-android-spike/         standalone P0 proof: AccessibilityService, gate, notification probe
+android/               enforcement services, alarms, and the Kotlin half of the bridge
 ios-spike/             paused
 ```
 
@@ -110,8 +108,9 @@ quota cannot be tempted to check it ([D-013](docs/DECISIONS.md)).
 
 ## Next
 
-1. **Run it on the phone.** Nothing here has been compiled for Android — the checklist is
-   in [`docs/P0_SPIKE_ANDROID.md`](docs/P0_SPIKE_ANDROID.md).
-2. Onboarding — the permission ladder and the signed declaration (FR-24).
-3. Remaining screens: Hours (schedules), The Record (insights), VIPs.
-4. Surface the D-010 watchdog on the Front Desk, not only in Office Rules.
+1. Onboarding — the permission ladder and the signed declaration (FR-24). The Gate
+   already displays the declaration, so until this exists that part of it is blank.
+2. Remaining screens: Hours (schedules), The Record (insights), VIPs.
+3. Surface the D-010 watchdog on the Front Desk, not only in Office Rules.
+4. The multi-day OxygenOS survival check — Q5 in
+   [`docs/P0_SPIKE_ANDROID.md`](docs/P0_SPIKE_ANDROID.md).
