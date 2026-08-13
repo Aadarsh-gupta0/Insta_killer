@@ -114,6 +114,7 @@ class NativeState {
     required this.grantEndsAtEpochMs,
     required this.launchReason,
     required this.permissions,
+    this.blockedApp,
     required this.lastWatcherHeartbeatEpochMs,
   });
 
@@ -125,6 +126,13 @@ class NativeState {
   LaunchReason launchReason;
 
   Permissions permissions;
+
+  /// The app that triggered this launch, resolved to a label and icon by the platform.
+  ///
+  /// Null when the app was opened from its own icon. Resolving it here rather than
+  /// making Dart search the installed-apps list keeps the Gate's first frame off the
+  /// critical path of a few hundred package lookups.
+  InstalledApp? blockedApp;
 
   /// Epoch millis of the last time `ForegroundWatcher` was alive. 0 means never.
   ///
@@ -138,6 +146,7 @@ class NativeState {
       grantEndsAtEpochMs,
       launchReason,
       permissions,
+      blockedApp,
       lastWatcherHeartbeatEpochMs,
     ];
   }
@@ -149,7 +158,8 @@ class NativeState {
       grantEndsAtEpochMs: result[1]! as int,
       launchReason: result[2]! as LaunchReason,
       permissions: result[3]! as Permissions,
-      lastWatcherHeartbeatEpochMs: result[4]! as int,
+      blockedApp: result[4] as InstalledApp?,
+      lastWatcherHeartbeatEpochMs: result[5]! as int,
     );
   }
 }

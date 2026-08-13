@@ -12,7 +12,7 @@ Test device: OnePlus 12R, Android 16 (OxygenOS 16).
 | | Status |
 |---|---|
 | `packages/domain` — the rules | **108 tests, 93%+ coverage.** Analyzer clean. |
-| `lib/` — the Flutter app | **66 tests.** Gate, Front Desk, Office Rules, Blocklist, platform repository. |
+| `lib/` — the Flutter app | **68 tests.** Gate, Front Desk, Office Rules, Blocklist, platform repository. |
 | `android/` — enforcement + Pigeon bridge | **Verified on device**, 13 Aug 2026. |
 | `ios-spike/` | Written, never compiled. Paused. |
 
@@ -49,6 +49,7 @@ lib/
   app/providers.dart   Riverpod wiring; the only place rules meet UI
   data/                repository seam — in-memory for tests, Pigeon-backed in the app
   design/tokens.dart   the Permit Office: palette, type, spacing, motion
+  design/permit_pad.dart  the signature interaction — tear a stub, stamp it
   features/gate/       the reflex interrupt — 4s pause, declaration, reason
   features/home/       Front Desk
   features/blocklist/  which apps are gated

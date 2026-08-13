@@ -63,6 +63,13 @@ class NativeState {
   late LaunchReason launchReason;
   late Permissions permissions;
 
+  /// The app that triggered this launch, resolved to a label and icon by the platform.
+  ///
+  /// Null when the app was opened from its own icon. Resolving it here rather than
+  /// making Dart search the installed-apps list keeps the Gate's first frame off the
+  /// critical path of a few hundred package lookups.
+  InstalledApp? blockedApp;
+
   /// Epoch millis of the last time `ForegroundWatcher` was alive. 0 means never.
   ///
   /// This is the watchdog from D-010: OxygenOS kills background services and reverts

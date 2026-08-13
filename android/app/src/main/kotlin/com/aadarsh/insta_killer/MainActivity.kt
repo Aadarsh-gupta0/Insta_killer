@@ -24,6 +24,7 @@ class MainActivity : FlutterActivity() {
 
         val api = OfficeHostApiImpl(applicationContext) { this }
         api.launchReason = reasonFrom(intent)
+        api.blockedPackage = intent?.getStringExtra(EXTRA_BLOCKED_PACKAGE)
         hostApi = api
 
         OfficeHostApi.setUp(flutterEngine.dartExecutor.binaryMessenger, api)
@@ -67,6 +68,7 @@ class MainActivity : FlutterActivity() {
 
         val reason = reasonFrom(intent)
         hostApi?.launchReason = reason
+        hostApi?.blockedPackage = intent.getStringExtra(EXTRA_BLOCKED_PACKAGE)
         if (reason == LaunchReason.GATE) {
             flutterApi?.onGateRequested { }
         }

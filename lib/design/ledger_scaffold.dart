@@ -86,6 +86,7 @@ class LedgerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
+      container: true,
       label: label,
       value: value,
       excludeSemantics: true,

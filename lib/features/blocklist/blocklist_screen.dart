@@ -193,6 +193,7 @@ class _AppRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
+      container: true,
       button: true,
       checked: selected,
       label: app.label,

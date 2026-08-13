@@ -147,6 +147,14 @@ data class NativeState (
   val launchReason: LaunchReason,
   val permissions: Permissions,
   /**
+   * The app that triggered this launch, resolved to a label and icon by the platform.
+   *
+   * Null when the app was opened from its own icon. Resolving it here rather than
+   * making Dart search the installed-apps list keeps the Gate's first frame off the
+   * critical path of a few hundred package lookups.
+   */
+  val blockedApp: InstalledApp? = null,
+  /**
    * Epoch millis of the last time `ForegroundWatcher` was alive. 0 means never.
    *
    * This is the watchdog from D-010: OxygenOS kills background services and reverts
@@ -161,8 +169,9 @@ data class NativeState (
       val grantEndsAtEpochMs = pigeonVar_list[1] as Long
       val launchReason = pigeonVar_list[2] as LaunchReason
       val permissions = pigeonVar_list[3] as Permissions
-      val lastWatcherHeartbeatEpochMs = pigeonVar_list[4] as Long
-      return NativeState(blockingEnabled, grantEndsAtEpochMs, launchReason, permissions, lastWatcherHeartbeatEpochMs)
+      val blockedApp = pigeonVar_list[4] as InstalledApp?
+      val lastWatcherHeartbeatEpochMs = pigeonVar_list[5] as Long
+      return NativeState(blockingEnabled, grantEndsAtEpochMs, launchReason, permissions, blockedApp, lastWatcherHeartbeatEpochMs)
     }
   }
   fun toList(): List<Any?> {
@@ -171,6 +180,7 @@ data class NativeState (
       grantEndsAtEpochMs,
       launchReason,
       permissions,
+      blockedApp,
       lastWatcherHeartbeatEpochMs,
     )
   }

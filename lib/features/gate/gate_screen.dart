@@ -8,7 +8,9 @@ import 'package:insta_killer_domain/insta_killer_domain.dart';
 import '../../app/providers.dart';
 import '../../design/ledger_scaffold.dart';
 import '../../design/office_button.dart';
+import '../../design/permit_pad.dart';
 import '../../design/tokens.dart';
+import '../../platform/office_api.g.dart';
 
 /// FR-13 — at least four seconds, not skippable.
 const Duration gatePause = Duration(seconds: 4);
@@ -20,11 +22,18 @@ const Duration gatePause = Duration(seconds: 4);
 /// then offers a way through. Leaving is the larger, default action; asking for a permit
 /// is available but not encouraged.
 class GateScreen extends ConsumerStatefulWidget {
-  const GateScreen({super.key, this.onLeave});
+  const GateScreen({super.key, this.onLeave, this.blockedApp});
 
   /// On Android this pops the Activity back to the launcher. Injected so the screen
   /// stays testable without a platform channel.
   final VoidCallback? onLeave;
+
+  /// The app that was just turned away, if the platform could name it.
+  ///
+  /// Android hands us package names, so unlike the iOS design (C-3, opaque tokens) the
+  /// Gate can be specific about what it stopped. A generic block screen is easy to
+  /// argue with; one that names the thing you reached for is not.
+  final InstalledApp? blockedApp;
 
   @override
   ConsumerState<GateScreen> createState() => _GateScreenState();
@@ -39,6 +48,10 @@ class _GateScreenState extends ConsumerState<GateScreen>
   bool _requesting = false;
   final TextEditingController _reason = TextEditingController();
   PermitRefused? _refusal;
+
+  /// Set once a permit is issued, which turns the stub into a stamped receipt.
+  String? _issuedSerial;
+  DateTime? _issuedUntil;
 
   @override
   void initState() {
@@ -69,6 +82,7 @@ class _GateScreenState extends ConsumerState<GateScreen>
   }
 
   Future<void> _request() async {
+    if (_requesting) return;
     setState(() => _requesting = true);
     final decision =
         await ref.read(officeProvider.notifier).requestPermit(_reason.text);
@@ -79,10 +93,22 @@ class _GateScreenState extends ConsumerState<GateScreen>
     // channel takes to answer — on a refusal the user is already in a bad moment, and
     // making them wait to be told no is the wrong place to be slow.
     setState(() {
-      _refusal = switch (decision) {
-        PermitGranted() => null,
-        PermitRefused() => decision,
-      };
+      switch (decision) {
+        case PermitGranted(:final permit):
+          _refusal = null;
+          // Serial numbered per day, so it reads as a record rather than a UUID.
+          final issuedToday = ref
+              .read(officeProvider)
+              .valueOrNull
+              ?.events
+              .where((e) => e.kind == EventKind.permitIssued)
+              .length ??
+              1;
+          _issuedSerial = '№ ${issuedToday.toString().padLeft(4, '0')}';
+          _issuedUntil = permit.nominalEnd;
+        case PermitRefused():
+          _refusal = decision;
+      }
       _requesting = false;
     });
 
@@ -105,6 +131,10 @@ class _GateScreenState extends ConsumerState<GateScreen>
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (widget.blockedApp case final InstalledApp app) ...[
+            _BlockedAppRow(app: app),
+            const SizedBox(height: Space.lg),
+          ],
           _BreathingBeat(controller: _breath, complete: _pauseComplete),
           const SizedBox(height: Space.xl),
 
@@ -118,15 +148,7 @@ class _GateScreenState extends ConsumerState<GateScreen>
             const SizedBox(height: Space.xl),
           ],
 
-          if (quota != null)
-            LedgerRow(
-              label: 'Permits remaining today',
-              value: '${quota.remaining} of ${quota.permitsPerDay}',
-              valueColor: quota.exhausted ? Palette.stamp : Palette.ink,
-            ),
-
           if (_pauseComplete) ...[
-            const SizedBox(height: Space.lg),
             Text('STATE YOUR REASON', style: TextStyles.eyebrow),
             const SizedBox(height: Space.sm),
             OfficeField(
@@ -136,6 +158,25 @@ class _GateScreenState extends ConsumerState<GateScreen>
                   : '$reasonLength of $minimumReasonLength characters minimum',
               onChanged: (_) => setState(() {}),
             ),
+            const SizedBox(height: Space.xl),
+
+            // The pad replaces what used to be a plain "Request a permit" button.
+            // Spending something finite should feel like spending it (brief §5).
+            if (quota != null)
+              PermitPad(
+                remaining: quota.remaining,
+                perDay: quota.permitsPerDay,
+                enabled: reasonOk && !_requesting,
+                serial: _issuedSerial,
+                validUntil: _issuedUntil,
+                onTear: _request,
+                disabledReason: quota.exhausted
+                    ? 'Pad empty. Next issue ${_clockTime(quota.resetsAt)}.'
+                    : reasonOk
+                        ? null
+                        : 'State a reason of at least $minimumReasonLength '
+                            'characters first.',
+              ),
           ],
 
           if (_refusal case final PermitRefused refusal) ...[
@@ -144,27 +185,13 @@ class _GateScreenState extends ConsumerState<GateScreen>
           ],
         ],
       ),
-      footer: Column(
-        children: [
-          OfficeButton(
-            label: 'Leave',
-            weight: ButtonWeight.primary,
-            onPressed: _pauseComplete ? widget.onLeave : null,
-            semanticHint: _pauseComplete
-                ? 'Closes this and returns to the home screen'
-                : 'Available once the pause finishes',
-          ),
-          const SizedBox(height: Space.sm),
-          OfficeButton(
-            label: 'Request a permit',
-            onPressed: (_pauseComplete && reasonOk && !_requesting)
-                ? _request
-                : null,
-            semanticHint: reasonOk
-                ? 'Spends one of today\'s permits'
-                : 'Type at least $minimumReasonLength characters first',
-          ),
-        ],
+      footer: OfficeButton(
+        label: _issuedSerial == null ? 'Leave' : 'Done',
+        weight: ButtonWeight.primary,
+        onPressed: _pauseComplete ? widget.onLeave : null,
+        semanticHint: _pauseComplete
+            ? 'Closes this and returns to the home screen'
+            : 'Available once the pause finishes',
       ),
     );
   }
@@ -174,6 +201,40 @@ class _GateScreenState extends ConsumerState<GateScreen>
 ///
 /// Not decoration — a countdown you can watch is easier to sit through than a dead
 /// screen, and sitting through it is the entire intervention.
+/// Names the app that was turned away. Icon small, label in the office's hand.
+class _BlockedAppRow extends StatelessWidget {
+  const _BlockedAppRow({required this.app});
+
+  final InstalledApp app;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: '${app.label} was blocked',
+      excludeSemantics: true,
+      child: Row(
+        children: [
+          if (app.icon case final icon?) ...[
+            Image.memory(icon, width: 28, height: 28,
+                filterQuality: FilterQuality.medium),
+            const SizedBox(width: Space.sm),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('TURNED AWAY', style: TextStyles.eyebrow),
+                Text(app.label, style: TextStyles.bodyStrong),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BreathingBeat extends StatelessWidget {
   const _BreathingBeat({required this.controller, required this.complete});
 
@@ -311,7 +372,7 @@ class _RefusalNotice extends StatelessWidget {
         RefusalReason.clockTampered => 'Clock discrepancy',
       };
 
-  static String _clockTime(DateTime at) =>
-      '${at.hour.toString().padLeft(2, '0')}:'
-      '${at.minute.toString().padLeft(2, '0')}';
 }
+
+String _clockTime(DateTime at) => '${at.hour.toString().padLeft(2, '0')}:'
+    '${at.minute.toString().padLeft(2, '0')}';

@@ -66,6 +66,10 @@ class _OfficeButtonState extends State<OfficeButton> {
     }
 
     return Semantics(
+      // container: true is what makes this a node of its own. Without it the annotation
+      // merges into the nearest ancestor, and a screen reader reads the whole page as one
+      // utterance with no button to focus — the control is effectively invisible.
+      container: true,
       button: true,
       enabled: widget.enabled,
       label: widget.label,

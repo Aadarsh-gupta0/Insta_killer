@@ -6,6 +6,7 @@ import 'package:insta_killer/data/office_repository.dart';
 import 'package:insta_killer/design/office_button.dart';
 import 'package:insta_killer/design/tokens.dart';
 import 'package:insta_killer/features/gate/gate_screen.dart';
+import 'package:insta_killer/platform/office_api.g.dart';
 import 'package:insta_killer_domain/insta_killer_domain.dart';
 
 const validReason = 'checking the group chat about tomorrow';
@@ -22,6 +23,7 @@ void main() {
     List<Event> events = const [],
     String? declaration,
     VoidCallback? onLeave,
+    InstalledApp? blockedApp,
   }) async {
     repo = InMemoryOfficeRepository(
       rules: rules,
@@ -40,7 +42,7 @@ void main() {
           color: Palette.ledger,
           builder: (context, _) => DefaultTextStyle(
             style: TextStyles.bodyText,
-            child: GateScreen(onLeave: onLeave),
+            child: GateScreen(onLeave: onLeave, blockedApp: blockedApp),
           ),
         ),
       ),
@@ -53,12 +55,24 @@ void main() {
   OfficeButton button(WidgetTester tester, String label) =>
       tester.widget<OfficeButton>(find.widgetWithText(OfficeButton, label));
 
+  /// Uses the button rather than the drag, because §3.7 requires the two to be
+  /// equivalent and the button is the one a screen reader reaches.
+  Future<void> tearStub(WidgetTester tester) async {
+    final finder = find.widgetWithText(OfficeButton, 'TEAR OFF A STUB');
+    await tester.ensureVisible(finder);
+    await tester.pump();
+    await tester.tap(finder);
+    await tester.pump();
+    await tester.pump();
+  }
+
   group('FR-13 — the pause is not skippable', () {
     testWidgets('both actions are disabled before four seconds', (tester) async {
       await pumpGate(tester);
 
       expect(button(tester, 'LEAVE').enabled, isFalse);
-      expect(button(tester, 'REQUEST A PERMIT').enabled, isFalse);
+      // The pad is not even on screen until the pause finishes.
+      expect(find.text('PERMIT PAD'), findsNothing);
 
       // Still locked at 3.9s. If this ever passes early, the interrupt is gone.
       await tester.pump(const Duration(milliseconds: 3900));
@@ -87,20 +101,20 @@ void main() {
   });
 
   group('FR-14 — a typed reason of at least 12 characters', () {
-    testWidgets('the request stays disabled until the reason is long enough',
+    testWidgets('the stub cannot be torn until the reason is long enough',
         (tester) async {
       await pumpGate(tester);
       await tester.pump(const Duration(seconds: 4));
 
-      expect(button(tester, 'REQUEST A PERMIT').enabled, isFalse);
+      expect(button(tester, 'TEAR OFF A STUB').enabled, isFalse);
 
       await tester.enterText(find.byType(EditableText), 'bored');
       await tester.pump();
-      expect(button(tester, 'REQUEST A PERMIT').enabled, isFalse);
+      expect(button(tester, 'TEAR OFF A STUB').enabled, isFalse);
 
       await tester.enterText(find.byType(EditableText), validReason);
       await tester.pump();
-      expect(button(tester, 'REQUEST A PERMIT').enabled, isTrue);
+      expect(button(tester, 'TEAR OFF A STUB').enabled, isTrue);
     });
 
     testWidgets('whitespace does not count toward the minimum', (tester) async {
@@ -109,7 +123,7 @@ void main() {
 
       await tester.enterText(find.byType(EditableText), 'ok          ');
       await tester.pump();
-      expect(button(tester, 'REQUEST A PERMIT').enabled, isFalse);
+      expect(button(tester, 'TEAR OFF A STUB').enabled, isFalse);
     });
   });
 
@@ -135,15 +149,13 @@ void main() {
   });
 
   group('granting and refusing', () {
-    testWidgets('a valid request issues a permit and records it', (tester) async {
+    testWidgets('tearing a stub issues a permit and stamps it', (tester) async {
       await pumpGate(tester);
       await tester.pump(const Duration(seconds: 4));
       await tester.enterText(find.byType(EditableText), validReason);
       await tester.pump();
 
-      await tester.tap(find.widgetWithText(OfficeButton, 'REQUEST A PERMIT'));
-      await tester.pump();
-      await tester.pump();
+      await tearStub(tester);
 
       final permit = await repo.loadActivePermit();
       expect(permit, isNotNull);
@@ -152,10 +164,14 @@ void main() {
 
       final events = await repo.loadEvents();
       expect(events.where((e) => e.kind == EventKind.permitIssued), hasLength(1));
+
+      // The stub becomes a receipt: serial and the time it runs out.
+      expect(find.text('№ 0001'), findsOneWidget);
+      expect(find.text('VALID UNTIL 14:15'), findsOneWidget);
+      expect(find.text('ISSUED'), findsOneWidget);
     });
 
-    testWidgets('an exhausted quota refuses and names the next issue time',
-        (tester) async {
+    testWidgets('an exhausted pad is dead, not merely refusing', (tester) async {
       await pumpGate(
         tester,
         events: [
@@ -167,13 +183,11 @@ void main() {
       await tester.enterText(find.byType(EditableText), validReason);
       await tester.pump();
 
-      await tester.tap(find.widgetWithText(OfficeButton, 'REQUEST A PERMIT'));
-      await tester.pump();
-      await tester.pump();
-
-      expect(find.text('Pad empty'), findsOneWidget);
+      // FR-17 wants the affordance disabled, not a refusal on press.
+      expect(button(tester, 'TEAR OFF A STUB').enabled, isFalse);
+      expect(find.text('PAD EMPTY'), findsOneWidget);
       // The day boundary is 06:00, so the next issue is tomorrow morning.
-      expect(find.text('Next issue 06:00.'), findsOneWidget);
+      expect(find.textContaining('Next issue 06:00'), findsOneWidget);
       expect(await repo.loadActivePermit(), isNull);
     });
 
@@ -188,9 +202,7 @@ void main() {
       await tester.enterText(find.byType(EditableText), validReason);
       await tester.pump();
 
-      await tester.tap(find.widgetWithText(OfficeButton, 'REQUEST A PERMIT'));
-      await tester.pump();
-      await tester.pump();
+      await tearStub(tester);
 
       expect(find.text('Closed hours'), findsOneWidget);
       expect(find.text('Next issue 15:00.'), findsOneWidget);
@@ -213,6 +225,28 @@ void main() {
         (tester) async {
       await pumpGate(tester, declaration: '   ');
       expect(find.text('YOU WROTE'), findsNothing);
+    });
+  });
+
+  group('naming the app that was turned away', () {
+    testWidgets('shows the label of the blocked app', (tester) async {
+      await pumpGate(
+        tester,
+        blockedApp: InstalledApp(
+          packageName: 'com.instagram.android',
+          label: 'Instagram',
+        ),
+      );
+
+      expect(find.text('TURNED AWAY'), findsOneWidget);
+      expect(find.text('Instagram'), findsOneWidget);
+    });
+
+    testWidgets('stays generic when the platform could not name it',
+        (tester) async {
+      // Uninstalled since, or opened from our own icon.
+      await pumpGate(tester);
+      expect(find.text('TURNED AWAY'), findsNothing);
     });
   });
 

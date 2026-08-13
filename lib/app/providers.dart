@@ -31,6 +31,13 @@ enum Entry { frontDesk, gate }
 
 final entryProvider = StateProvider<Entry>((ref) => Entry.frontDesk);
 
+/// Which app triggered the Gate, resolved to a label and icon by the platform.
+///
+/// Null when the app was opened from its own icon, or when the platform could not name
+/// the package — uninstalled since, most likely. The Gate degrades to a generic heading
+/// rather than showing a blank row.
+final blockedAppProvider = StateProvider<InstalledApp?>((ref) => null);
+
 /// Everything the office knows, loaded once and mutated through intents.
 class OfficeState {
   const OfficeState({

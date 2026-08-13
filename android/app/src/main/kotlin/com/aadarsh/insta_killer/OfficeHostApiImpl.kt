@@ -29,6 +29,9 @@ class OfficeHostApiImpl(
     /** Set by [MainActivity] from the launch intent before Dart first asks. */
     var launchReason: LaunchReason = LaunchReason.ICON
 
+    /** The package whose launch was intercepted, if any. */
+    var blockedPackage: String? = null
+
     override fun state(): NativeState = NativeState(
         blockingEnabled = store.blockingEnabled,
         grantEndsAtEpochMs = store.grantEndsAt,
@@ -38,7 +41,19 @@ class OfficeHostApiImpl(
             notificationAccess = isNotificationAccessEnabled(),
         ),
         lastWatcherHeartbeatEpochMs = store.watcherHeartbeat,
+        blockedApp = blockedPackage?.let(::describeApp),
     )
+
+    /** Label and icon for one package. Null when it has been uninstalled since. */
+    private fun describeApp(packageName: String): InstalledApp? = runCatching {
+        val pm = context.packageManager
+        val info = pm.getApplicationInfo(packageName, 0)
+        InstalledApp(
+            packageName = packageName,
+            label = pm.getApplicationLabel(info).toString(),
+            icon = runCatching { encodeIcon(pm.getApplicationIcon(info)) }.getOrNull(),
+        )
+    }.getOrNull()
 
     override fun installedApps(): List<InstalledApp> {
         val pm = context.packageManager

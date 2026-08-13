@@ -160,6 +160,7 @@ class _ActivePermit extends StatelessWidget {
     final warning = remaining <= const Duration(minutes: 2);
 
     return Semantics(
+      container: true,
       liveRegion: true,
       label: 'Permit active, ${remaining.inMinutes} minutes remaining',
       excludeSemantics: true,
@@ -231,6 +232,7 @@ class _StreakStamps extends StatelessWidget {
     final shown = streak.current.clamp(0, _maxStamps);
 
     return Semantics(
+      container: true,
       label: 'Current streak ${streak.current} clean days, '
           'longest ${streak.longest}',
       excludeSemantics: true,

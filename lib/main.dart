@@ -27,6 +27,7 @@ Future<void> main() async {
     final state = await host.state();
     container.read(entryProvider.notifier).state =
         state.launchReason == LaunchReason.gate ? Entry.gate : Entry.frontDesk;
+    container.read(blockedAppProvider.notifier).state = state.blockedApp;
   } catch (_) {
     // No platform on the other end (a test harness, a desktop debug run). The Front Desk
     // is the safe default: it shows state and offers nothing that needs enforcement.
@@ -93,6 +94,7 @@ class InstaKillerApp extends ConsumerWidget {
       home: switch (entry) {
         Entry.gate => GateScreen(
             onLeave: () => ref.read(hostApiProvider).leaveToHome(),
+            blockedApp: ref.watch(blockedAppProvider),
           ),
         Entry.frontDesk => const FrontDeskScreen(),
       },
