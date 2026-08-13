@@ -5,6 +5,39 @@ why. Newest first.
 
 ---
 
+## 2026-08-13 — D-013: Native holds two numbers; everything else crosses as opaque JSON
+
+**Chosen:** the Pigeon bridge exposes exactly two pieces of typed state that Kotlin acts
+on — `blockingEnabled` and `grantEndsAt` — plus a `read`/`write` pair for JSON strings
+Kotlin never parses. Rules, quota, schedule, event log and settings all live in
+`packages/domain` and cross the bridge as text.
+
+**Rejected:** a richer bridge with `permitsRemainingToday`, `isWithinSchedule` and the
+day boundary exposed as typed fields, so the service could decide for itself whether to
+show the Gate.
+
+**Why:** the same argument as D-002, which the iOS design reached first. Every rule
+duplicated into the native layer is a rule that can silently diverge from the tested one,
+in a process with no debugger attached. Android makes this easier than iOS did — the
+service does not need to decide anything, because unlike a shield extension it can simply
+launch our UI and let Dart decide. So it gets told two things: whether to act at all, and
+whether a permit is currently running.
+
+Making the rest opaque is not cosmetic. A native service that *cannot read* the quota
+cannot be tempted into checking it.
+
+**The one asymmetry worth naming:** enforcement resumes by comparing `grantEndsAt`
+against the clock on every accessibility event, not by an alarm switching blocking back
+on. Alarms get dropped — by Doze, by OxygenOS, by a reboot — and a dropped alarm under
+the alarm-driven design would mean Instagram stays open indefinitely. Under this one it
+costs a notification. The alarms exist only for FR-19's warnings.
+
+**Cost:** the event log is a JSON blob rewritten on every append, which is fine only
+while Dart is the sole writer. The moment a service needs to append, this has to become
+real storage — D-001's reasoning, which applies as soon as there are two writers.
+
+---
+
 ## 2026-08-12 — D-012: iOS is paused; Android is the shipping platform
 
 **Chosen:** all development continues on Android. The iOS spike, its Swift, and the

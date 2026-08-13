@@ -12,9 +12,9 @@ Test device: OnePlus 12R, Android 16 (OxygenOS 16).
 | | Status |
 |---|---|
 | `packages/domain` — the rules | **102 tests, 93.5% coverage.** Analyzer clean. |
-| `lib/` — the Flutter app | **26 widget tests.** Gate and Front Desk built and passing. |
-| `android-spike/` — enforcement proof | Verified working on device. Not yet merged into the app. |
-| Native wiring — services → Flutter gate | **Next.** Not started. |
+| `lib/` — the Flutter app | **39 tests.** Gate, Front Desk, and the platform repository. |
+| `android/` — enforcement + Pigeon bridge | Written, **never compiled.** Awaiting first device run. |
+| `android-spike/` | Superseded by `android/`. Kept until the merged build is verified. |
 | `ios-spike/` | Written, never compiled. Paused. |
 
 ```
@@ -73,10 +73,43 @@ The trade is honest and worth knowing: iOS shields are enforced by the OS and su
 app being killed. On Android the block *is* our process, so OxygenOS can switch it off
 silently. That is why the app watches its own pulse ([D-010](docs/DECISIONS.md)).
 
+## How enforcement works
+
+```
+Instagram opens
+      │
+ForegroundWatcher   AccessibilityService — told instantly, and exempt from the
+      │             background-activity-launch limits that stop a plain service
+      │             opening a screen
+      ├── blocking off?     → do nothing
+      ├── permit running?   → do nothing      (compares a timestamp, not an alarm)
+      └── otherwise         → launch MainActivity with reason=gate
+                                    │
+                            the Flutter Gate
+                                    │
+                     4s pause · declaration · reason ≥ 12 chars
+                                    │
+                        GatePolicy.evaluate()   ← every rule, pure Dart
+                                    │
+                     ┌──────────────┴──────────────┐
+                  refused                       granted
+                     │                             │
+        reason + next possible time    grantEndsAt = now + 15 min
+                                       alarms for T-2min and T-0
+```
+
+The watcher checks a timestamp rather than waiting for an alarm to re-arm blocking.
+Alarms get dropped — by Doze, by OxygenOS, by a reboot — and under an alarm-driven design
+a dropped one would leave Instagram open indefinitely. Here it costs a notification.
+
+Native knows two things: whether to act, and whether a permit is running. Everything else
+crosses the bridge as JSON that Kotlin never parses, so a service that cannot read the
+quota cannot be tempted to check it ([D-013](docs/DECISIONS.md)).
+
 ## Next
 
-1. Merge the spike's services into `android/`, and launch the Flutter Gate from
-   `ForegroundWatcher` instead of the throwaway `GateActivity`.
-2. Pigeon bridge, so the Dart rules and the native services read one store.
-3. Permit expiry via `AlarmManager`, boot receiver, and the D-010 watchdog.
-4. Remaining screens: Blocklist, Hours, The Record, Office Rules, onboarding.
+1. **Run it on the phone.** Nothing here has been compiled for Android — the checklist is
+   in [`docs/P0_SPIKE_ANDROID.md`](docs/P0_SPIKE_ANDROID.md).
+2. Onboarding — there is currently no UI to switch blocking on.
+3. Remaining screens: Blocklist, Hours, The Record, Office Rules.
+4. Surface the D-010 watchdog on the Front Desk.

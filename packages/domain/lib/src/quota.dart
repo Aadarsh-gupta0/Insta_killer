@@ -21,6 +21,17 @@ class QuotaPolicy {
         boundary: boundary ?? this.boundary,
       );
 
+  Map<String, Object?> toJson() => {
+        'permitsPerDay': permitsPerDay,
+        'boundary': boundary.toJson(),
+      };
+
+  static QuotaPolicy fromJson(Map<String, Object?> json) => QuotaPolicy(
+        permitsPerDay: json['permitsPerDay']! as int,
+        boundary:
+            DayBoundary.fromJson((json['boundary']! as Map).cast<String, Object?>()),
+      );
+
   QuotaState stateAt(DateTime instant, Iterable<Event> events) {
     final day = QuotaDay.forInstant(instant, boundary);
     final issued = events

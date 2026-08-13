@@ -18,6 +18,13 @@ class DayBoundary {
 
   int get minutesFromMidnight => hour * 60 + minute;
 
+  Map<String, Object?> toJson() => {'hour': hour, 'minute': minute};
+
+  static DayBoundary fromJson(Map<String, Object?> json) => DayBoundary(
+        hour: json['hour']! as int,
+        minute: json['minute']! as int,
+      );
+
   @override
   String toString() =>
       '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';

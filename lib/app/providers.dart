@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:insta_killer_domain/insta_killer_domain.dart';
 
 import '../data/office_repository.dart';
+import '../platform/office_api.g.dart';
 
 /// Overridden in tests and at startup. Never read a clock directly in a widget — FR-20
 /// only works if every reading comes from one place.
@@ -12,6 +13,23 @@ final repositoryProvider = Provider<OfficeRepository>(
     'Override repositoryProvider at the root of the app or in a test.',
   ),
 );
+
+/// The platform bridge, for the few things Dart cannot do itself — opening a Settings
+/// screen, leaving to the launcher. State goes through [repositoryProvider] instead.
+final hostApiProvider = Provider<OfficeHostApi>(
+  (ref) => throw UnimplementedError(
+    'Override hostApiProvider at the root of the app or in a test.',
+  ),
+);
+
+/// Which screen the app is showing.
+///
+/// Set at launch from the intent, and again by the platform when Instagram is opened
+/// against an already-warm engine. It lives here rather than in `main.dart` so the
+/// provider layer does not have to import the app entry point back.
+enum Entry { frontDesk, gate }
+
+final entryProvider = StateProvider<Entry>((ref) => Entry.frontDesk);
 
 /// Everything the office knows, loaded once and mutated through intents.
 class OfficeState {

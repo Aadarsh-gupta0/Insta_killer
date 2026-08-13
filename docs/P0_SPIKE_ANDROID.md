@@ -83,6 +83,50 @@ you loudly. That is a real feature we would have to build, not a settings proble
 
 ---
 
+---
+
+## Verifying the merged app (do this now — the spike is superseded)
+
+The enforcement services now live in the Flutter app, not in `android-spike/`. **The
+merged build has never been compiled**, so treat the first run as the real test.
+
+```
+flutter run --release        # from the repo root, phone attached
+```
+
+Permissions are the same three as the spike, plus one that is new:
+
+1. Accessibility → InstaKiller → on (plus the **Allow restricted settings** dance).
+2. Notification access → on.
+3. The four OxygenOS battery steps above, including the padlock in Recents.
+4. **Notifications**: the app asks on first launch. Accept it, or FR-19's two-minute
+   warning silently never arrives.
+
+Then walk this path, which is the whole product in one pass:
+
+- [ ] Open the app from the launcher → the **Front Desk** appears, not the Gate
+- [ ] Turn blocking on (currently only settable in code — onboarding is not built yet;
+      if there is no control, set `blockingEnabled` via the debugger or wait for the
+      Office Rules screen)
+- [ ] Open Instagram → the **Gate** appears, with the four-second ring counting down
+- [ ] Both buttons are dead until the ring completes
+- [ ] Swipe back during the pause → **nothing happens**
+- [ ] Type fewer than 12 characters → *Request a permit* stays disabled
+- [ ] Type a real reason → request → the Gate accepts and the app closes to home
+- [ ] Open Instagram again → **it opens normally**, permit is running
+- [ ] Front Desk shows a live `MM:SS` countdown in blue
+- [ ] Wait for the two-minute warning notification
+- [ ] Wait for expiry → notification, and Instagram is gated again on next open
+- [ ] Issue three permits in one day → the fourth is refused with `Pad empty` and
+      `Next issue 06:00`
+- [ ] Reboot mid-permit → the permit is still running and still expires on time
+
+Report anything that deviates. The Dart side is covered by 141 tests; the Kotlin is not
+covered by anything at all, so failures are far likelier to be on that side of the
+bridge.
+
+---
+
 ## The checklist
 
 Screenshot the panel and fill in the blanks.

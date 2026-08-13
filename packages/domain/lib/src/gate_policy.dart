@@ -48,6 +48,34 @@ class OfficeRules {
         grantDuration: grantDuration ?? this.grantDuration,
         blockedAppCount: blockedAppCount ?? this.blockedAppCount,
       );
+
+  Map<String, Object?> toJson() => {
+        'quota': quota.toJson(),
+        'schedule': schedule.toJson(),
+        'strictMode': strictMode,
+        'grantDurationMs': grantDuration.inMilliseconds,
+        'blockedAppCount': blockedAppCount,
+      };
+
+  /// Missing keys fall back to the stricter default rather than throwing.
+  ///
+  /// This is read at every cold start, including the first one after an update that
+  /// added a field. Failing to parse would leave the app with no rules at all, and "no
+  /// rules" resolves to "nothing is blocked" — the opposite of what NFR-2 requires when
+  /// state is inconsistent.
+  static OfficeRules fromJson(Map<String, Object?> json) => OfficeRules(
+        quota: json['quota'] == null
+            ? QuotaPolicy.standard
+            : QuotaPolicy.fromJson((json['quota']! as Map).cast<String, Object?>()),
+        schedule: json['schedule'] == null
+            ? const WeeklySchedule.empty()
+            : WeeklySchedule.fromJson(json['schedule']! as List<Object?>),
+        strictMode: json['strictMode'] as bool? ?? true,
+        grantDuration: json['grantDurationMs'] == null
+            ? defaultGrantDuration
+            : Duration(milliseconds: json['grantDurationMs']! as int),
+        blockedAppCount: json['blockedAppCount'] as int? ?? 0,
+      );
 }
 
 enum RefusalReason {

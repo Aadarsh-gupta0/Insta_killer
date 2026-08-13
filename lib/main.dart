@@ -2,47 +2,84 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/providers.dart';
-import 'data/office_repository.dart';
 import 'design/tokens.dart';
 import 'features/gate/gate_screen.dart';
 import 'features/home/front_desk_screen.dart';
+import 'platform/office_api.g.dart';
+import 'platform/pigeon_office_repository.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final host = OfficeHostApi();
+
+  final container = ProviderContainer(
+    overrides: [
+      repositoryProvider.overrideWithValue(PigeonOfficeRepository(host: host)),
+      hostApiProvider.overrideWithValue(host),
+    ],
+  );
+
+  // Ask the platform why we were started before showing anything. Opening the Front Desk
+  // for a beat and then swapping to the Gate would hand the user a moment where the only
+  // thing on screen is a way out — and the Gate is on the critical path of a reflex.
+  try {
+    final state = await host.state();
+    container.read(entryProvider.notifier).state =
+        state.launchReason == LaunchReason.gate ? Entry.gate : Entry.frontDesk;
+  } catch (_) {
+    // No platform on the other end (a test harness, a desktop debug run). The Front Desk
+    // is the safe default: it shows state and offers nothing that needs enforcement.
+  }
+
+  OfficeFlutterApi.setUp(_PlatformEvents(container));
+
   runApp(
-    ProviderScope(
-      overrides: [
-        // TODO(platform): swap for the Pigeon-backed repository once the Android
-        // channel lands. Everything above this line is already written against the
-        // interface, so it is a one-line change.
-        repositoryProvider.overrideWithValue(InMemoryOfficeRepository()),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: const InstaKillerApp(),
     ),
   );
 }
 
-/// Which screen the app opens on depends on how it was launched.
-///
-/// Android's `ForegroundWatcher` starts us because Instagram was opened, in which case
-/// the Gate is the only thing that should appear. Tapping the icon opens the Front Desk.
-enum Entry { frontDesk, gate }
+/// Calls arriving from Kotlin while the engine is already warm.
+class _PlatformEvents implements OfficeFlutterApi {
+  _PlatformEvents(this.container);
 
-class InstaKillerApp extends StatelessWidget {
-  const InstaKillerApp({super.key, this.entry = Entry.frontDesk});
+  final ProviderContainer container;
 
-  final Entry entry;
+  /// Instagram was opened and our process was already alive, so there was no cold launch
+  /// to read an intent from.
+  @override
+  void onGateRequested() {
+    container.read(entryProvider.notifier).state = Entry.gate;
+  }
 
   @override
-  Widget build(BuildContext context) {
+  void onGrantExpired() {
+    container.read(entryProvider.notifier).state = Entry.frontDesk;
+    container.read(officeProvider.notifier).reconcile();
+  }
+}
+
+class InstaKillerApp extends ConsumerWidget {
+  const InstaKillerApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entry = ref.watch(entryProvider);
+
     return WidgetsApp(
       title: 'Insta_killer',
       color: Palette.ledger,
-      // No MaterialApp: it would drag in Material's theme, ripples and page
-      // transitions, all of which argue against the design. See design/tokens.dart.
+      // No MaterialApp: it brings Material's theme, ripples and page transitions, all of
+      // which argue against the design. See design/tokens.dart.
       builder: (context, _) => DefaultTextStyle(
         style: TextStyles.bodyText,
         child: switch (entry) {
-          Entry.gate => const GateScreen(),
+          Entry.gate => GateScreen(
+              onLeave: () => ref.read(hostApiProvider).leaveToHome(),
+            ),
           Entry.frontDesk => const FrontDeskScreen(),
         },
       ),
