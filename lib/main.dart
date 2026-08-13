@@ -74,14 +74,31 @@ class InstaKillerApp extends ConsumerWidget {
       color: Palette.ledger,
       // No MaterialApp: it brings Material's theme, ripples and page transitions, all of
       // which argue against the design. See design/tokens.dart.
-      builder: (context, _) => DefaultTextStyle(
+      //
+      // Keyed by entry so that switching to the Gate rebuilds the Navigator from
+      // scratch. Without the key, being sent to the Gate while Office Rules is pushed
+      // would leave Office Rules sitting on top of it — a settings screen covering the
+      // one screen that exists to interrupt you.
+      key: ValueKey(entry),
+      pageRouteBuilder: <T>(RouteSettings settings, WidgetBuilder builder) =>
+          PageRouteBuilder<T>(
+        settings: settings,
+        pageBuilder: (context, _, _) => builder(context),
+        // A cross-fade, not a slide. The office does not swoosh.
+        transitionsBuilder: (context, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
+        transitionDuration: Motion.quick,
+        reverseTransitionDuration: Motion.quick,
+      ),
+      home: switch (entry) {
+        Entry.gate => GateScreen(
+            onLeave: () => ref.read(hostApiProvider).leaveToHome(),
+          ),
+        Entry.frontDesk => const FrontDeskScreen(),
+      },
+      builder: (context, child) => DefaultTextStyle(
         style: TextStyles.bodyText,
-        child: switch (entry) {
-          Entry.gate => GateScreen(
-              onLeave: () => ref.read(hostApiProvider).leaveToHome(),
-            ),
-          Entry.frontDesk => const FrontDeskScreen(),
-        },
+        child: child ?? const SizedBox.shrink(),
       ),
     );
   }

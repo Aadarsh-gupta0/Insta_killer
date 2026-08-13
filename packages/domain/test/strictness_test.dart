@@ -96,6 +96,18 @@ void main() {
     test('an identical edit is neutral', () {
       expect(classifyChange(base, base.copyWith()), ChangeDirection.neutral);
     });
+
+    test('switching enforcement on tightens', () {
+      expect(
+        classifyChange(base, base.copyWith(enforcementEnabled: true)),
+        ChangeDirection.tighten,
+      );
+    });
+
+    test('switching enforcement off loosens', () {
+      final on = base.copyWith(enforcementEnabled: true);
+      expect(classifyChange(on, base), ChangeDirection.loosen);
+    });
   });
 
   group('cooldown', () {
@@ -154,6 +166,42 @@ void main() {
       final applied = policy.applyIfDue(pending, now.add(const Duration(hours: 24)));
       expect(applied, isNotNull);
       expect(applied!.quota.permitsPerDay, 5);
+    });
+
+    test('enforcement can be switched on instantly', () {
+      // Onboarding must not make the user wait a day to start.
+      expect(
+        request(base.copyWith(enforcementEnabled: true)),
+        isA<ChangeApplied>(),
+      );
+    });
+
+    test('enforcement cannot be switched off instantly', () {
+      final on = base.copyWith(enforcementEnabled: true);
+      final outcome = policy.request(
+        from: on,
+        to: on.copyWith(enforcementEnabled: false),
+        now: now,
+        description: 'test',
+        idFactory: () => 'chg-1',
+      );
+
+      expect(outcome, isA<ChangeQueued>(),
+          reason: 'otherwise Strict Mode has a hole labelled "off"');
+    });
+
+    test('a queued change survives a JSON round trip', () {
+      final pending =
+          (request(base.copyWith(quota: const QuotaPolicy(permitsPerDay: 5)))
+                  as ChangeQueued)
+              .pending;
+
+      final restored = PendingChange.fromJson(pending.toJson());
+      expect(restored.id, pending.id);
+      expect(restored.appliesAt.millisecondsSinceEpoch,
+          pending.appliesAt.millisecondsSinceEpoch);
+      expect(restored.resulting.quota.permitsPerDay, 5);
+      expect(restored.description, 'test');
     });
 
     test('remaining never goes negative', () {

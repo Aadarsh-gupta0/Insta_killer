@@ -8,6 +8,7 @@ import '../../app/providers.dart';
 import '../../design/ledger_scaffold.dart';
 import '../../design/office_button.dart';
 import '../../design/tokens.dart';
+import '../settings/office_rules_screen.dart';
 
 /// State at a glance. One primary action, no encouragement.
 class FrontDeskScreen extends ConsumerStatefulWidget {
@@ -106,6 +107,27 @@ class _FrontDeskScreenState extends ConsumerState<FrontDeskScreen>
           Text('CLEAN DAYS', style: TextStyles.eyebrow),
           const SizedBox(height: Space.sm),
           if (streak != null) _StreakStamps(streak: streak),
+
+          const SizedBox(height: Space.xxl),
+          if (!office.rules.enforcementEnabled)
+            Padding(
+              padding: const EdgeInsets.only(bottom: Space.md),
+              child: Text(
+                'Nothing is being blocked. Open Office rules to start.',
+                style: TextStyles.caption.copyWith(color: Palette.stamp),
+              ),
+            ),
+          // Deliberately quiet and at the bottom: §6 asks the Front Desk for one primary
+          // action, and settings is never it.
+          OfficeButton(
+            label: 'Office rules',
+            onPressed: () => Navigator.of(context).push(
+              PageRouteBuilder<void>(
+                pageBuilder: (context, _, _) => const OfficeRulesScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: Space.lg),
         ],
       ),
       footer: status != null && status.active

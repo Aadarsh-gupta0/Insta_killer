@@ -105,9 +105,12 @@ Permissions are the same three as the spike, plus one that is new:
 Then walk this path, which is the whole product in one pass:
 
 - [ ] Open the app from the launcher → the **Front Desk** appears, not the Gate
-- [ ] Turn blocking on (currently only settable in code — onboarding is not built yet;
-      if there is no control, set `blockingEnabled` via the debugger or wait for the
-      Office Rules screen)
+- [ ] Front Desk says *"Nothing is being blocked"* in red at the bottom
+- [ ] Tap **Office rules** → the permissions block shows accessibility and notification
+      access as `granted`, and *Watcher last seen* reads something recent
+- [ ] Tap **Start blocking** → it applies instantly and the notice says `Applied.`
+      *(if the button is dead, the accessibility service is off — the screen says so and
+      offers a route to Settings)*
 - [ ] Open Instagram → the **Gate** appears, with the four-second ring counting down
 - [ ] Both buttons are dead until the ring completes
 - [ ] Swipe back during the pause → **nothing happens**
@@ -120,6 +123,16 @@ Then walk this path, which is the whole product in one pass:
 - [ ] Issue three permits in one day → the fourth is refused with `Pad empty` and
       `Next issue 06:00`
 - [ ] Reboot mid-permit → the permit is still running and still expires on time
+
+And the asymmetry, which is the part most likely to feel wrong before it feels right:
+
+- [ ] Office rules → **Fewer** permits → applies immediately
+- [ ] **Request more** → nothing changes, a `CHANGE QUEUED` box appears counting down
+      from 24:00:00
+- [ ] **Cancel this change** → the box disappears, nothing was altered
+- [ ] **Request blocking off** → still blocking, and a 24-hour countdown starts
+      *(this is the one to be sure of: if blocking switches off immediately, Strict Mode
+      has a hole straight through it)*
 
 Report anything that deviates. The Dart side is covered by 141 tests; the Kotlin is not
 covered by anything at all, so failures are far likelier to be on that side of the

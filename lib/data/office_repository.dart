@@ -32,6 +32,12 @@ abstract interface class OfficeRepository {
   Future<String?> loadDeclaration();
 
   Future<void> saveDeclaration(String text);
+
+  /// FR-25 — a loosening waiting out its cooldown. At most one at a time: a queue of
+  /// them would let the user stack up an escape and forget which one lands when.
+  Future<PendingChange?> loadPendingChange();
+
+  Future<void> savePendingChange(PendingChange? change);
 }
 
 /// In-memory, for tests and for running the UI before the platform layer lands.
@@ -44,10 +50,12 @@ class InMemoryOfficeRepository implements OfficeRepository {
     List<Event>? events,
     Permit? activePermit,
     String? declaration,
+    PendingChange? pendingChange,
   })  : _rules = rules ?? const OfficeRules(),
         _events = [...?events] {
     _activePermit = activePermit;
     _declaration = declaration;
+    _pending = pendingChange;
   }
 
   OfficeRules _rules;
@@ -55,6 +63,7 @@ class InMemoryOfficeRepository implements OfficeRepository {
   Permit? _activePermit;
   DateTime? _highWaterMark;
   String? _declaration;
+  PendingChange? _pending;
 
   @override
   Future<OfficeRules> loadRules() async => _rules;
@@ -86,4 +95,11 @@ class InMemoryOfficeRepository implements OfficeRepository {
 
   @override
   Future<void> saveDeclaration(String text) async => _declaration = text;
+
+  @override
+  Future<PendingChange?> loadPendingChange() async => _pending;
+
+  @override
+  Future<void> savePendingChange(PendingChange? change) async =>
+      _pending = change;
 }

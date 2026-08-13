@@ -11,8 +11,8 @@ Test device: OnePlus 12R, Android 16 (OxygenOS 16).
 
 | | Status |
 |---|---|
-| `packages/domain` — the rules | **102 tests, 93.5% coverage.** Analyzer clean. |
-| `lib/` — the Flutter app | **39 tests.** Gate, Front Desk, and the platform repository. |
+| `packages/domain` — the rules | **107 tests, 93%+ coverage.** Analyzer clean. |
+| `lib/` — the Flutter app | **55 tests.** Gate, Front Desk, Office Rules, platform repository. |
 | `android/` — enforcement + Pigeon bridge | Written, **never compiled.** Awaiting first device run. |
 | `android-spike/` | Superseded by `android/`. Kept until the merged build is verified. |
 | `ios-spike/` | Written, never compiled. Paused. |
@@ -48,10 +48,12 @@ packages/domain/       the rules, pure Dart, no Flutter import ever (D-011)
 
 lib/
   app/providers.dart   Riverpod wiring; the only place rules meet UI
-  data/                repository seam — in-memory today, Pigeon-backed next
+  data/                repository seam — in-memory for tests, Pigeon-backed in the app
   design/tokens.dart   the Permit Office: palette, type, spacing, motion
   features/gate/       the reflex interrupt — 4s pause, declaration, reason
   features/home/       Front Desk
+  features/settings/   Office Rules — the master switch and the cooldown
+  platform/            Pigeon bridge + the repository behind it
 
 android/               the Flutter app's Android project
 android-spike/         standalone P0 proof: AccessibilityService, gate, notification probe
@@ -110,6 +112,6 @@ quota cannot be tempted to check it ([D-013](docs/DECISIONS.md)).
 
 1. **Run it on the phone.** Nothing here has been compiled for Android — the checklist is
    in [`docs/P0_SPIKE_ANDROID.md`](docs/P0_SPIKE_ANDROID.md).
-2. Onboarding — there is currently no UI to switch blocking on.
-3. Remaining screens: Blocklist, Hours, The Record, Office Rules.
-4. Surface the D-010 watchdog on the Front Desk.
+2. Onboarding — the permission ladder and the signed declaration (FR-24).
+3. Remaining screens: Hours (schedules), The Record (insights), VIPs.
+4. Surface the D-010 watchdog on the Front Desk, not only in Office Rules.

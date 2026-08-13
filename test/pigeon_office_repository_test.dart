@@ -9,7 +9,11 @@ import 'package:insta_killer_domain/insta_killer_domain.dart';
 class FakeHost extends OfficeHostApi {
   final Map<String, String> blobs = {};
   final List<int> grantsBegun = [];
+  final List<bool> blockingPushes = [];
   int grantsEnded = 0;
+
+  bool? get blockingEnabled =>
+      blockingPushes.isEmpty ? null : blockingPushes.last;
 
   @override
   Future<String?> read(String key) async => blobs[key];
@@ -23,6 +27,10 @@ class FakeHost extends OfficeHostApi {
 
   @override
   Future<void> endGrant() async => grantsEnded++;
+
+  @override
+  Future<void> setBlockingEnabled(bool enabled) async =>
+      blockingPushes.add(enabled);
 }
 
 void main() {
@@ -72,6 +80,32 @@ void main() {
       expect(rules.strictMode, isTrue,
           reason: 'failing open would mean nothing is blocked');
       expect(rules.quota.permitsPerDay, 3);
+    });
+
+    test('saving pushes the master switch to native', () async {
+      await repo.saveRules(const OfficeRules(enforcementEnabled: true));
+      expect(host.blockingEnabled, isTrue,
+          reason: 'the watcher reads the flag, not the JSON');
+
+      await repo.saveRules(const OfficeRules());
+      expect(host.blockingEnabled, isFalse);
+    });
+
+    test('loading repairs a native flag that has drifted', () async {
+      await repo.saveRules(const OfficeRules(enforcementEnabled: true));
+      host.blockingPushes.clear();
+
+      await repo.loadRules();
+      expect(host.blockingEnabled, isTrue,
+          reason: 'JSON is the source of truth; the flag is derived from it');
+    });
+
+    test('corrupt settings switch enforcement off natively too', () async {
+      host.blobs['rules'] = 'garbage';
+      await repo.loadRules();
+
+      expect(host.blockingEnabled, isFalse,
+          reason: 'the default is off, and native must agree with it');
     });
 
     test('a partial record keeps the strict default for missing fields',

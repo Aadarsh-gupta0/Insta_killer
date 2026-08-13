@@ -22,12 +22,23 @@ class OfficeRules {
     this.strictMode = true,
     this.grantDuration = defaultGrantDuration,
     this.blockedAppCount = 0,
+    this.enforcementEnabled = false,
   });
 
   final QuotaPolicy quota;
   final WeeklySchedule schedule;
   final bool strictMode;
   final Duration grantDuration;
+
+  /// The master switch.
+  ///
+  /// A rule, not a preference, which is why it lives here rather than only in the
+  /// platform layer: switching enforcement *off* is the largest loosening available, and
+  /// it has to go through the same cooldown as everything else (FR-25). Otherwise Strict
+  /// Mode has a hole straight through it labelled "off".
+  ///
+  /// Defaults to false so installing the app changes nothing until onboarding says so.
+  final bool enforcementEnabled;
 
   /// Only the count — the tokens themselves are opaque and live on the platform side
   /// (C-3). It is here because removing an app is a loosening change (FR-25) and the
@@ -40,6 +51,7 @@ class OfficeRules {
     bool? strictMode,
     Duration? grantDuration,
     int? blockedAppCount,
+    bool? enforcementEnabled,
   }) =>
       OfficeRules(
         quota: quota ?? this.quota,
@@ -47,6 +59,7 @@ class OfficeRules {
         strictMode: strictMode ?? this.strictMode,
         grantDuration: grantDuration ?? this.grantDuration,
         blockedAppCount: blockedAppCount ?? this.blockedAppCount,
+        enforcementEnabled: enforcementEnabled ?? this.enforcementEnabled,
       );
 
   Map<String, Object?> toJson() => {
@@ -55,6 +68,7 @@ class OfficeRules {
         'strictMode': strictMode,
         'grantDurationMs': grantDuration.inMilliseconds,
         'blockedAppCount': blockedAppCount,
+        'enforcementEnabled': enforcementEnabled,
       };
 
   /// Missing keys fall back to the stricter default rather than throwing.
@@ -75,6 +89,7 @@ class OfficeRules {
             ? defaultGrantDuration
             : Duration(milliseconds: json['grantDurationMs']! as int),
         blockedAppCount: json['blockedAppCount'] as int? ?? 0,
+        enforcementEnabled: json['enforcementEnabled'] as bool? ?? false,
       );
 }
 

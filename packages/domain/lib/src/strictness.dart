@@ -54,6 +54,16 @@ ChangeDirection classifyChange(OfficeRules from, OfficeRules to) {
     }
   }
 
+  // The master switch. Turning enforcement on is the whole point and applies at once;
+  // turning it off is the largest loosening there is and waits like any other.
+  if (from.enforcementEnabled != to.enforcementEnabled) {
+    if (to.enforcementEnabled) {
+      sawTighten = true;
+    } else {
+      sawLoosen = true;
+    }
+  }
+
   // A day boundary move is genuinely ambiguous — it can shift a reset earlier or later
   // depending on when you ask. Treated as a loosening because we resolve ambiguity
   // toward more restriction (NFR-2), and making the user wait is the restrictive option.
@@ -93,6 +103,23 @@ class PendingChange {
     final left = appliesAt.difference(now);
     return left.isNegative ? Duration.zero : left;
   }
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'requestedAt': requestedAt.toUtc().toIso8601String(),
+        'appliesAt': appliesAt.toUtc().toIso8601String(),
+        'resulting': resulting.toJson(),
+        'description': description,
+      };
+
+  static PendingChange fromJson(Map<String, Object?> json) => PendingChange(
+        id: json['id']! as String,
+        requestedAt: DateTime.parse(json['requestedAt']! as String).toLocal(),
+        appliesAt: DateTime.parse(json['appliesAt']! as String).toLocal(),
+        resulting:
+            OfficeRules.fromJson((json['resulting']! as Map).cast<String, Object?>()),
+        description: json['description']! as String,
+      );
 }
 
 sealed class ChangeOutcome {

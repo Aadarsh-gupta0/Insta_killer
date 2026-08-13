@@ -39,6 +39,7 @@ class OfficeState {
     required this.activePermit,
     required this.declaration,
     required this.clockGuard,
+    required this.pendingChange,
   });
 
   final OfficeRules rules;
@@ -47,12 +48,17 @@ class OfficeState {
   final String? declaration;
   final ClockGuard clockGuard;
 
+  /// FR-25 — a loosening waiting out its 24 hours, if any.
+  final PendingChange? pendingChange;
+
   OfficeState copyWith({
     OfficeRules? rules,
     List<Event>? events,
     Permit? activePermit,
     bool clearActivePermit = false,
     String? declaration,
+    PendingChange? pendingChange,
+    bool clearPendingChange = false,
   }) =>
       OfficeState(
         rules: rules ?? this.rules,
@@ -61,6 +67,8 @@ class OfficeState {
             clearActivePermit ? null : (activePermit ?? this.activePermit),
         declaration: declaration ?? this.declaration,
         clockGuard: clockGuard,
+        pendingChange:
+            clearPendingChange ? null : (pendingChange ?? this.pendingChange),
       );
 }
 
@@ -69,13 +77,28 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
 
   Clock get _clock => ref.read(clockProvider);
 
+  static const _strictness = StrictnessPolicy();
+
   @override
   Future<OfficeState> build() async {
-    final rules = await _repo.loadRules();
+    var rules = await _repo.loadRules();
     final events = await _repo.loadEvents();
     final permit = await _repo.loadActivePermit();
     final mark = await _repo.loadClockHighWaterMark();
     final declaration = await _repo.loadDeclaration();
+    var pending = await _repo.loadPendingChange();
+
+    // A cooldown that only elapses while the app is open would be no cooldown at all, so
+    // a change that came due while we were closed is applied here, on the next start.
+    if (pending != null) {
+      final due = _strictness.applyIfDue(pending, _clock.wall());
+      if (due != null) {
+        rules = due;
+        pending = null;
+        await _repo.saveRules(due);
+        await _repo.savePendingChange(null);
+      }
+    }
 
     return OfficeState(
       rules: rules,
@@ -83,7 +106,75 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
       activePermit: permit,
       declaration: declaration,
       clockGuard: ClockGuard(highWaterMark: mark),
+      pendingChange: pending,
     );
+  }
+
+  /// FR-25 — the asymmetry. Tightening lands now; loosening waits 24 hours.
+  ///
+  /// Returns what happened so the screen can say so rather than guess.
+  Future<ChangeOutcome> requestRulesChange(
+    OfficeRules to, {
+    required String description,
+  }) async {
+    final current = await future;
+
+    final outcome = _strictness.request(
+      from: current.rules,
+      to: to,
+      now: _clock.wall(),
+      description: description,
+    );
+
+    final event = Event(
+      at: _clock.wall(),
+      kind: EventKind.settingChanged,
+      detail: switch (outcome) {
+        ChangeApplied() => 'applied: $description',
+        ChangeQueued() => 'queued: $description',
+      },
+    );
+    await _repo.append(event);
+
+    switch (outcome) {
+      case ChangeApplied(:final rules):
+        await _repo.saveRules(rules);
+        state = AsyncData(current.copyWith(
+          rules: rules,
+          events: [...current.events, event],
+        ));
+
+      case ChangeQueued(:final pending):
+        // One at a time. Replacing rather than queueing behind the existing one, so the
+        // countdown on screen always refers to the change the user just asked for.
+        await _repo.savePendingChange(pending);
+        state = AsyncData(current.copyWith(
+          pendingChange: pending,
+          events: [...current.events, event],
+        ));
+    }
+
+    return outcome;
+  }
+
+  /// FR-26 — cancellable right up to the moment it lands.
+  Future<void> cancelPendingChange() async {
+    final current = await future;
+    final pending = current.pendingChange;
+    if (pending == null) return;
+    if (!_strictness.canCancel(pending, _clock.wall())) return;
+
+    final event = Event(
+      at: _clock.wall(),
+      kind: EventKind.settingChanged,
+      detail: 'cancelled: ${pending.description}',
+    );
+    await _repo.append(event);
+    await _repo.savePendingChange(null);
+    state = AsyncData(current.copyWith(
+      events: [...current.events, event],
+      clearPendingChange: true,
+    ));
   }
 
   /// FR-7 — every launch attempt is recorded, whether or not it becomes a permit.
@@ -168,7 +259,20 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
   /// Called on resume. NFR-2: any inconsistency resolves toward more restriction, so a
   /// permit that expired while we were backgrounded is cleared here rather than lingering.
   Future<void> reconcile() async {
-    final current = await future;
+    var current = await future;
+
+    // The cooldown runs on wall time, not on how long the app was open.
+    final pending = current.pendingChange;
+    if (pending != null) {
+      final due = _strictness.applyIfDue(pending, _clock.wall());
+      if (due != null) {
+        await _repo.saveRules(due);
+        await _repo.savePendingChange(null);
+        current = current.copyWith(rules: due, clearPendingChange: true);
+        state = AsyncData(current);
+      }
+    }
+
     final permit = current.activePermit;
     if (permit == null) return;
 

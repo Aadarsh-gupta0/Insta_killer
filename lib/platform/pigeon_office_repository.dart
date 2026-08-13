@@ -25,23 +25,37 @@ class PigeonOfficeRepository implements OfficeRepository {
   static const _permitKey = 'permit';
   static const _markKey = 'clock.mark';
   static const _declarationKey = 'declaration';
+  static const _pendingKey = 'pending';
 
   @override
   Future<OfficeRules> loadRules() async {
     final raw = await _host.read(_rulesKey);
-    if (raw == null) return const OfficeRules();
-    try {
-      return OfficeRules.fromJson(jsonDecode(raw) as Map<String, Object?>);
-    } catch (_) {
-      // Corrupt settings resolve to the defaults, which are the strict ones. Throwing
-      // here would leave the app with no rules, and no rules means nothing is blocked.
-      return const OfficeRules();
+    OfficeRules rules;
+    if (raw == null) {
+      rules = const OfficeRules();
+    } else {
+      try {
+        rules = OfficeRules.fromJson(jsonDecode(raw) as Map<String, Object?>);
+      } catch (_) {
+        // Corrupt settings resolve to the defaults, which are the strict ones. Throwing
+        // here would leave the app with no rules, and no rules means nothing is blocked.
+        rules = const OfficeRules();
+      }
     }
+
+    // Repair on read. The JSON is the source of truth and the native flag is derived, so
+    // if they have drifted — an update, a restore, a half-finished write — this is where
+    // they are put back in step (NFR-2).
+    await _host.setBlockingEnabled(rules.enforcementEnabled);
+    return rules;
   }
 
   @override
-  Future<void> saveRules(OfficeRules rules) =>
-      _host.write(_rulesKey, jsonEncode(rules.toJson()));
+  Future<void> saveRules(OfficeRules rules) async {
+    await _host.write(_rulesKey, jsonEncode(rules.toJson()));
+    // The watcher reads this flag, not the JSON, so it has to be pushed separately.
+    await _host.setBlockingEnabled(rules.enforcementEnabled);
+  }
 
   @override
   Future<List<Event>> loadEvents() async {
@@ -118,4 +132,23 @@ class PigeonOfficeRepository implements OfficeRepository {
   @override
   Future<void> saveDeclaration(String text) =>
       _host.write(_declarationKey, text);
+
+  @override
+  Future<PendingChange?> loadPendingChange() async {
+    final raw = await _host.read(_pendingKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return PendingChange.fromJson(jsonDecode(raw) as Map<String, Object?>);
+    } catch (_) {
+      // A queued *loosening* that cannot be read is one that never lands. That is the
+      // strict direction, so dropping it is the right failure.
+      return null;
+    }
+  }
+
+  @override
+  Future<void> savePendingChange(PendingChange? change) => _host.write(
+        _pendingKey,
+        change == null ? '' : jsonEncode(change.toJson()),
+      );
 }
