@@ -116,10 +116,19 @@ could pull it out and generate their own approvals. That takes deliberate effort
 developer tools — which is exactly the kind of effort a weak moment does not involve — but
 it is possible, and you should know it is.
 
+Which is why the app makes them prove it. Pairing is not complete until their phone
+answers a challenge correctly — so "I sent them the code" is never taken on trust, and a
+Guardian who never installed the app is caught at pairing rather than a day into a
+cooldown.
+
 Two other things worth knowing:
 
 - **The Guardian needs this app on their phone** to work out the codes. They need no
   account and nothing is sent anywhere, but they do need the app.
+- **Delete your copy of the shared code once they have it.** If you keep it, you can
+  answer your own requests. The app hides the Guardian tools on a phone that already has
+  a Guardian, which stops the easy version, but a code sitting in your own messages is
+  still a code you can use.
 - **If they vanish, you are not trapped.** Removing a Guardian needs their approval like
   any other loosening, so a Guardian who loses their phone or stops replying could
   otherwise lock your settings forever. An unapproved removal therefore goes through on

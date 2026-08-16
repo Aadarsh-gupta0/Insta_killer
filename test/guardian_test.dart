@@ -238,6 +238,15 @@ void main() {
       await tester.pump();
     }
 
+    Future<void> tapButton(WidgetTester tester, String label) async {
+      final finder = find.widgetWithText(OfficeButton, label);
+      await tester.ensureVisible(finder);
+      await tester.pump();
+      await tester.tap(finder);
+      await tester.pump();
+      await tester.pump();
+    }
+
     testWidgets('offers a shared code when nobody is paired', (tester) async {
       await pumpGuardian(tester);
 
@@ -249,14 +258,47 @@ void main() {
       final repo = InMemoryOfficeRepository();
       await pumpGuardian(tester, repository: repo);
 
-      final finder = find.widgetWithText(OfficeButton, 'THEY HAVE IT — PAIR');
-      await tester.ensureVisible(finder);
-      await tester.pump();
-      await tester.tap(finder);
-      await tester.pump();
+      await tapButton(tester, 'THEY HAVE IT — CHECK');
 
       expect(find.textContaining('name'), findsWidgets);
       expect(await repo.loadGuardianPairing(), isNull);
+    });
+
+    testWidgets('pairs only once their phone answers the challenge',
+        (tester) async {
+      final repo = InMemoryOfficeRepository();
+      await pumpGuardian(tester, repository: repo);
+
+      await tester.enterText(find.byType(EditableText).first, 'Priya');
+      await tester.pump();
+      await tapButton(tester, 'THEY HAVE IT — CHECK');
+
+      expect(find.text('PROVE IT REACHED THEM'), findsOneWidget);
+      expect(await repo.loadGuardianPairing(), isNull,
+          reason: 'showing the code is not the same as them having it');
+
+      // A wrong answer — which is what an uninstalled second phone produces.
+      // Field order on screen: name, pairing answer, then the Guardian half's two.
+      await tester.enterText(find.byType(EditableText).at(1), '000000');
+      await tester.pump();
+      await tapButton(tester, 'CONFIRM THE PAIRING');
+
+      expect(await repo.loadGuardianPairing(), isNull);
+      expect(find.textContaining('have not set up the app'), findsOneWidget);
+    });
+
+    testWidgets('the Guardian half disappears once this phone is guarded',
+        (tester) async {
+      final repo = InMemoryOfficeRepository(
+        rules: const OfficeRules(guardianPaired: true),
+        guardianPairing: GuardianPairing(name: 'Priya', pairedAt: now),
+      );
+      await pumpGuardian(tester, repository: repo);
+
+      expect(find.textContaining('Not available on this phone'), findsOneWidget);
+      expect(find.widgetWithText(OfficeButton, 'WORK OUT THE ANSWER'),
+          findsNothing,
+          reason: 'otherwise you can scroll down and approve your own requests');
     });
 
     testWidgets('shows who is paired once there is one', (tester) async {

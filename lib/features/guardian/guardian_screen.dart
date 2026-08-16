@@ -36,27 +36,61 @@ class _GuardianScreenState extends ConsumerState<GuardianScreen> {
   String? _error;
   String? _computed;
 
+  /// Set once the owner has sent the secret and asked for proof. Until the Guardian
+  /// answers this, nothing is paired.
+  ApprovalRequest? _pairingChallenge;
+  final _pairingAnswer = TextEditingController();
+
   @override
   void dispose() {
     _name.dispose();
     _response.dispose();
     _theirSecret.dispose();
     _theirChallenge.dispose();
+    _pairingAnswer.dispose();
     super.dispose();
   }
 
-  Future<void> _pair() async {
+  /// Step one: ask them to prove they have it.
+  void _askForProof() {
     if (_name.text.trim().isEmpty) {
       setState(() => _error = 'Give the Guardian a name first.');
       return;
     }
+    setState(() {
+      _error = null;
+      _pairingChallenge = ref.read(officeProvider.notifier).pairingChallenge();
+    });
+  }
+
+  /// Step two: pair only if their phone answered correctly.
+  Future<void> _confirmPairing() async {
+    final challenge = _pairingChallenge;
+    if (challenge == null) return;
+
+    final ok = ref.read(officeProvider.notifier).verifyPairing(
+          request: challenge,
+          secret: _offeredSecret,
+          response: _pairingAnswer.text,
+        );
+
+    if (!ok) {
+      setState(() => _error =
+          'That does not match. Either they have not set up the app yet, or '
+          'the code did not arrive intact.');
+      return;
+    }
+
     await ref
         .read(officeProvider.notifier)
         .pairGuardian(name: _name.text, secret: _offeredSecret);
     if (mounted) {
       setState(() {
         _error = null;
-        _notice = 'Paired. Loosening now needs their agreement.';
+        _pairingChallenge = null;
+        _pairingAnswer.clear();
+        _notice = 'Paired, and confirmed on their phone. '
+            'Loosening now needs their agreement.';
       });
     }
   }
@@ -125,7 +159,10 @@ class _GuardianScreenState extends ConsumerState<GuardianScreen> {
             _PairBlock(
               name: _name,
               secret: _offeredSecret,
-              onPair: _pair,
+              challenge: _pairingChallenge,
+              answer: _pairingAnswer,
+              onAskForProof: _askForProof,
+              onConfirm: _confirmPairing,
             ),
 
           if (office.guardianPaired &&
@@ -144,12 +181,21 @@ class _GuardianScreenState extends ConsumerState<GuardianScreen> {
           const SizedBox(height: Space.xxl),
           const Hairline(),
           const SizedBox(height: Space.md),
-          _GuardianModeBlock(
-            secret: _theirSecret,
-            challenge: _theirChallenge,
-            computed: _computed,
-            onAnswer: _answer,
-          ),
+
+          // Hidden once this phone has a Guardian of its own. Leaving it visible would
+          // let the owner paste their own shared code in and answer their own challenges
+          // without leaving the app — no rooting, no cleverness, just scrolling down.
+          // The secret is still on the device, so this is friction rather than proof, but
+          // it removes the one-tap version of the bypass.
+          if (office.guardianPaired)
+            const _GuardianModeHidden()
+          else
+            _GuardianModeBlock(
+              secret: _theirSecret,
+              challenge: _theirChallenge,
+              computed: _computed,
+              onAnswer: _answer,
+            ),
           const SizedBox(height: Space.xxl),
         ],
       ),
@@ -219,16 +265,43 @@ class _CodeBlockState extends State<CodeBlock> {
   }
 }
 
+/// Shown in place of the Guardian half once this phone is the one being guarded.
+class _GuardianModeHidden extends StatelessWidget {
+  const _GuardianModeHidden();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('I AM THE GUARDIAN', style: TextStyles.eyebrow),
+        const SizedBox(height: Space.sm),
+        Text(
+          'Not available on this phone. It has a Guardian of its own, and '
+          'answering your own challenges here would make that meaningless.',
+          style: TextStyles.caption,
+        ),
+      ],
+    );
+  }
+}
+
 class _PairBlock extends StatelessWidget {
   const _PairBlock({
     required this.name,
     required this.secret,
-    required this.onPair,
+    required this.challenge,
+    required this.answer,
+    required this.onAskForProof,
+    required this.onConfirm,
   });
 
   final TextEditingController name;
   final String secret;
-  final VoidCallback onPair;
+  final ApprovalRequest? challenge;
+  final TextEditingController answer;
+  final VoidCallback onAskForProof;
+  final VoidCallback onConfirm;
 
   @override
   Widget build(BuildContext context) {
@@ -260,17 +333,48 @@ class _PairBlock extends StatelessWidget {
         const SizedBox(height: Space.sm),
         Text(
           'Send this to them once, however you normally talk. They enter it '
-          'under "I am the Guardian" on their own phone. After that it is '
-          'never needed again — and if you keep a copy, you can approve your '
-          'own requests, which rather defeats the point.',
+          'under "I am the Guardian" on their own phone. Then delete your copy '
+          '— if you keep it, you can answer your own requests, and the '
+          'Guardian becomes decoration.',
           style: TextStyles.caption,
         ),
         const SizedBox(height: Space.md),
-        OfficeButton(
-          label: 'They have it — pair',
-          weight: ButtonWeight.primary,
-          onPressed: onPair,
-        ),
+
+        if (challenge == null)
+          OfficeButton(
+            label: 'They have it — check',
+            weight: ButtonWeight.primary,
+            onPressed: onAskForProof,
+          )
+        else ...[
+          const SizedBox(height: Space.lg),
+          const Hairline(),
+          const SizedBox(height: Space.lg),
+          Text('PROVE IT REACHED THEM', style: TextStyles.eyebrow),
+          const SizedBox(height: Space.sm),
+          Text(
+            'Nothing is paired yet. Send them these six digits — their phone '
+            'turns them into an answer only it can work out. If it comes back '
+            'right, the app knows their side is real.',
+            style: TextStyles.bodyText,
+          ),
+          const SizedBox(height: Space.md),
+          CodeBlock(code: challenge!.challenge, size: 36),
+          const SizedBox(height: Space.md),
+          Text('THEIR ANSWER', style: TextStyles.eyebrow),
+          const SizedBox(height: Space.sm),
+          OfficeField(
+            controller: answer,
+            hint: 'Six digits from their phone',
+            maxLines: 1,
+          ),
+          const SizedBox(height: Space.md),
+          OfficeButton(
+            label: 'Confirm the pairing',
+            weight: ButtonWeight.primary,
+            onPressed: onConfirm,
+          ),
+        ],
       ],
     );
   }

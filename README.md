@@ -12,7 +12,7 @@ Test device: OnePlus 12R, Android 16 (OxygenOS 16).
 | | Status |
 |---|---|
 | `packages/domain` — the rules | **124 tests, 93%+ coverage.** Analyzer clean. |
-| `lib/` — the Flutter app | **87 tests.** Gate, Front Desk, Office Rules, Blocklist, Guardian, platform repository. |
+| `lib/` — the Flutter app | **89 tests.** Gate, Front Desk, Office Rules, Blocklist, Guardian, platform repository. |
 | `android/` — enforcement + Pigeon bridge | **Verified on device**, 13 Aug 2026. |
 | `ios-spike/` | Written, never compiled. Paused. |
 

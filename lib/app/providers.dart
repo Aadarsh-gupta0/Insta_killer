@@ -249,6 +249,29 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
 
   // --- FR-27, the Guardian ------------------------------------------------------
 
+  /// A challenge that proves a second device holds the secret.
+  ApprovalRequest pairingChallenge() => _guardians.pairingChallenge(
+        now: _clock.wall(),
+        digits: generateChallenge,
+      );
+
+  /// Whether the Guardian's phone answered the pairing challenge correctly.
+  ///
+  /// The whole point of the two-step pairing: without it, "they have it" is a claim by
+  /// the one person with a reason to fudge it, and a Guardian who never installed the app
+  /// is discovered only when a change is already stuck waiting for them.
+  bool verifyPairing({
+    required ApprovalRequest request,
+    required String secret,
+    required String response,
+  }) =>
+      _guardians.verifyPairing(
+        request: request,
+        response: response,
+        now: _clock.wall(),
+        signer: HmacCodeSigner(normaliseSecret(secret)),
+      );
+
   /// Pairs a Guardian. A tightening, so it lands immediately.
   Future<void> pairGuardian({
     required String name,

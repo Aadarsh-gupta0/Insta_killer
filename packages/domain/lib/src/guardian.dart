@@ -149,6 +149,36 @@ class GuardianPolicy {
   static bool isUnpairRequest(PendingChange change, {required bool paired}) =>
       paired && !change.resulting.guardianPaired;
 
+  /// The changeId used for the challenge that proves a pairing is real.
+  static const String pairingChangeId = 'pairing';
+
+  /// A challenge issued during pairing rather than for a queued change.
+  ///
+  /// Pairing without this is an assertion by the person with the most reason to fudge it:
+  /// you tap "they have it" and the app believes you. If the Guardian never installed
+  /// anything, the first anyone finds out is twenty-four hours into a cooldown, stuck.
+  /// Making them answer once proves a second device actually holds the secret.
+  ApprovalRequest pairingChallenge({
+    required DateTime now,
+    required String Function() digits,
+  }) =>
+      ApprovalRequest(
+        challenge: digits(),
+        issuedAt: now,
+        changeId: pairingChangeId,
+      );
+
+  /// Whether the answer to a pairing challenge is right.
+  bool verifyPairing({
+    required ApprovalRequest request,
+    required String response,
+    required DateTime now,
+    required CodeSigner signer,
+  }) =>
+      request.changeId == pairingChangeId &&
+      !request.isExpired(now) &&
+      _constantTimeEquals(signer.sign(request.challenge), response.trim());
+
   /// A fresh challenge for [change].
   ///
   /// [digits] supplies the randomness so this stays a pure function in tests. It must be

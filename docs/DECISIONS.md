@@ -48,6 +48,22 @@ direct instruction outranks the spec — but the spec's version is still buildab
 preferred: a printed sheet of one-time codes, each consumed once, no app on their side.
 Offered, not assumed.
 
+**Pairing is proved, not asserted.** The owner sends the secret, then their phone shows a
+pairing challenge that only a second device holding that secret can answer. Nothing is
+paired until it comes back right.
+
+This was added after the owner asked the obvious question — *how will you find out whether
+I installed it on the second phone?* — and the honest answer was that we could not. Tapping
+"they have it" was a claim by the one person with a reason to fudge it, and a Guardian who
+never installed anything would have been discovered a day into a cooldown, stuck.
+
+The same question exposed a larger hole: the "I am the Guardian" section sits on the
+owner's phone too, so you could pair, keep the code, scroll down and answer your own
+challenges. No rooting, no cleverness. That section is now hidden on any phone that has a
+Guardian of its own. The secret is still in storage, so this is friction rather than proof
+— but it removes the version of the bypass that takes one tap, and the pairing copy now
+says to delete your copy of the code rather than merely hinting at it.
+
 **A bug this turned up:** a queued change stores a full snapshot of the rules as they were
 when it was requested, so anything applied in between was silently reverted when the queued
 one landed. Applying an immediate change now discards any queued one. What gets dropped is
