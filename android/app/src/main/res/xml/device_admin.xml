@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  Deliberately empty.
+
+  An active device admin blocks uninstall regardless of which policies it holds, so this
+  app asks for none. Requesting force-lock, wipe-data or watch-login when we use none of
+  them would be asking for the power to erase the phone in exchange for a habit tracker.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies />
+</device-admin>

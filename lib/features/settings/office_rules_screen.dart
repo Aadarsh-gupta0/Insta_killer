@@ -62,6 +62,14 @@ class _OfficeRulesScreenState extends ConsumerState<OfficeRulesScreen>
     try {
       final state = await ref.read(hostApiProvider).state();
       if (mounted) setState(() => _native = state);
+
+      // Device admin is granted and revoked in system Settings, so the platform is the
+      // only source of truth for it. Sync on every read rather than trusting our own
+      // record — otherwise the screen keeps saying "protected" after the user has turned
+      // it off behind our back.
+      await ref
+          .read(officeProvider.notifier)
+          .reconcileDeviceAdmin(state.permissions.deviceAdmin);
     } catch (_) {
       // No platform on the other end (widget tests, desktop debug). The permissions
       // block simply does not render.
@@ -275,6 +283,47 @@ class _OfficeRulesScreenState extends ConsumerState<OfficeRulesScreen>
               rules.strictMode ? 'strict mode off' : 'strict mode on',
             ),
           ),
+
+          const SizedBox(height: Space.xl),
+          Text('UNINSTALL PROTECTION', style: TextStyles.eyebrow),
+          const SizedBox(height: Space.sm),
+          const Hairline(),
+          LedgerRow(
+            label: 'Device administrator',
+            value: rules.uninstallProtection ? 'active' : 'off',
+            valueColor:
+                rules.uninstallProtection ? Palette.seal : Palette.ink,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: Space.sm),
+            child: Text(
+              rules.uninstallProtection
+                  ? 'Android will not uninstall this app until you deactivate '
+                      'the administrator in Settings. That is one deliberate '
+                      'extra step, not a lock — nothing can stop you taking it.'
+                  : 'Without it, this app can be removed in the usual two taps, '
+                      'which is the whole block gone in a bad moment.',
+              style: TextStyles.caption,
+            ),
+          ),
+          if (rules.uninstallProtection)
+            OfficeButton(
+              label: 'Request protection off',
+              onPressed: () => _request(
+                rules.copyWith(uninstallProtection: false),
+                'uninstall protection off',
+              ),
+            )
+          else
+            OfficeButton(
+              label: 'Turn on protection',
+              weight: ButtonWeight.primary,
+              onPressed: () async {
+                // The system asks, not us. The answer comes back as a broadcast, so the
+                // rule is recorded by _refreshNative on the way back rather than here.
+                await ref.read(hostApiProvider).requestDeviceAdmin();
+              },
+            ),
 
           const SizedBox(height: Space.xl),
           Text('GUARDIAN', style: TextStyles.eyebrow),

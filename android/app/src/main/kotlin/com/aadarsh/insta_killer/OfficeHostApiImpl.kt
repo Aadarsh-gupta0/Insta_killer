@@ -1,6 +1,7 @@
 package com.aadarsh.insta_killer
 
 import android.app.Activity
+import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -39,6 +40,7 @@ class OfficeHostApiImpl(
         permissions = Permissions(
             accessibility = isAccessibilityEnabled(),
             notificationAccess = isNotificationAccessEnabled(),
+            deviceAdmin = AdminReceiver.isActive(context),
         ),
         lastWatcherHeartbeatEpochMs = store.watcherHeartbeat,
         blockedApp = blockedPackage?.let(::describeApp),
@@ -107,6 +109,38 @@ class OfficeHostApiImpl(
         // service restart. Null instance is fine — it re-reads the store on connect.
         ForegroundWatcher.instance?.applyWatchList()
     }
+
+    override fun requestDeviceAdmin() {
+        if (AdminReceiver.isActive(context)) return
+
+        val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+            putExtra(
+                DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                AdminReceiver.component(context),
+            )
+            putExtra(
+                DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                "Makes Android refuse to uninstall Insta_killer until you deactivate " +
+                    "this first. It asks for no other powers — it cannot lock, wipe or " +
+                    "watch anything.",
+            )
+        }
+
+        val host = activityProvider()
+        if (host != null) {
+            host.startActivity(intent)
+        } else {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
+    override fun releaseDeviceAdmin() {
+        if (!AdminReceiver.isActive(context)) return
+        context.getSystemService(DevicePolicyManager::class.java)
+            ?.removeActiveAdmin(AdminReceiver.component(context))
+    }
+
+    override fun lastAdminEvent(): String = store.lastAdminEvent ?: ""
 
     override fun setBlockingEnabled(enabled: Boolean) {
         store.blockingEnabled = enabled

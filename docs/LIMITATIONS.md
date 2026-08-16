@@ -136,23 +136,30 @@ Two other things worth knowing:
 
 ## The block is only as strong as your ability to delete this app
 
-Deleting Insta_killer removes its shields. There is no way around that. Anything we
-build on top is friction, not a lock.
+Deleting Insta_killer removes everything it does. Nothing in the app changes that.
+What the app can do is add steps between you and that decision.
 
-Real strength, weakest to strongest:
+On Android, weakest to strongest:
 
 1. **Strict Mode + cooldowns** — loosening any setting waits 24 hours. Stops an impulse,
    not a plan.
-2. **Guardian pairing** — a friend holds the code you need to loosen settings. Stops a
-   plan, if the friend holds the line.
-3. **Screen Time passcode set by someone else** — with *Content & Privacy Restrictions →
-   Deleting Apps → Don't Allow*, you cannot delete this app without their passcode. This
-   is the first option that is actually a lock.
-4. **A supervised device** with a configuration profile. Strongest, most annoying to set
-   up, and hard to undo on purpose.
+2. **Guardian pairing** — someone else holds the code you need to loosen anything. Stops
+   a plan, if they hold the line.
+3. **Uninstall protection (device administrator)** — Android refuses to uninstall the app
+   until you deactivate the administrator in Settings. **This is still not a lock.** It is
+   one extra, deliberate, clearly-labelled step, in a screen that warns you what it means.
+   Nothing in Android lets an app veto its own deactivation, and any app claiming
+   otherwise is lying to you.
+4. **Device owner provisioning** — the only genuine lock. `adb shell dpm set-device-owner`
+   on a phone with no accounts signed in, which in practice means a factory reset first.
+   It really does make the app unremovable without a computer, and undoing it needs one
+   too. Not offered behind a toggle, because it is not a toggle-sized decision.
 
-We will tell you which of these you have active. We will not call the app "unbreakable"
-at any tier.
+The app tells you which tier you are on and never overstates it. Tier 3 is switched on
+from Office Rules; turning it back off is a loosening, so it waits out the cooldown and
+needs the Guardian like anything else. Deactivating it directly in Android Settings
+bypasses that entirely — and when you do, the app notices on next open, records it, and
+stops claiming a protection it no longer has.
 
 ## The Gate screen depends on things outside our control
 

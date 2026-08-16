@@ -5,6 +5,39 @@ why. Newest first.
 
 ---
 
+## 2026-08-13 — D-016: Device admin for uninstall friction, and honesty about its limit
+
+**Chosen:** the app registers a `DeviceAdminReceiver` with **no policies at all**. While it
+is active, Android refuses to uninstall the app until the administrator is deactivated in
+Settings. Switching the protection on is a tightening and applies at once; giving it up is
+a loosening and goes through the cooldown and the Guardian.
+
+**A correction to what was said when this was proposed.** It was described as meaning
+deactivation "goes through the Guardian". It does not, and cannot. Deactivation happens in
+Android's own Settings, in a screen this app does not control and cannot veto — no app can.
+What device admin buys is **one deliberate extra step with a warning on it**, not a lock.
+Saying otherwise would have been exactly the overstatement NFR-7 forbids, so the copy, the
+docs and this entry all now say the smaller true thing.
+
+**Rejected: `setUninstallBlocked`**, the API that genuinely prevents removal. It requires
+device owner or profile owner, which means `adb shell dpm set-device-owner` on a phone with
+no accounts signed in — a factory reset in practice, and a computer to undo. That is a real
+option and it is documented as the tier above this one, but it is not a toggle-sized
+decision and it does not belong behind a switch.
+
+**No policies requested.** An active admin blocks uninstall regardless of what it holds, so
+asking for force-lock, wipe-data or watch-login would be requesting the power to erase the
+phone in exchange for a habit tracker. The policy file is deliberately empty.
+
+**Reality wins over our record.** The user can revoke the admin in Settings while the app
+is not even running. On the next foreground the app compares its rule against what the
+platform reports and, if the protection is gone, drops the rule *immediately* rather than
+queueing it — there is nothing to make them wait for, and continuing to display "protected"
+would be a claim the app cannot back. The revocation is written to the event log so the
+Record shows when it happened.
+
+---
+
 ## 2026-08-13 — D-015: The Guardian approves by challenge and response, with no server
 
 **Chosen:** the two phones share one secret, established once by copying a twenty-character

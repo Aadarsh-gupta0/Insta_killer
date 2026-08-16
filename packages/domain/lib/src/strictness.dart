@@ -71,6 +71,16 @@ ChangeDirection classifyChange(OfficeRules from, OfficeRules to) {
     }
   }
 
+  // Uninstall protection. Giving it up makes the app easier to delete, which is the
+  // loosening that matters most (FR-28).
+  if (from.uninstallProtection != to.uninstallProtection) {
+    if (to.uninstallProtection) {
+      sawTighten = true;
+    } else {
+      sawLoosen = true;
+    }
+  }
+
   // The master switch. Turning enforcement on is the whole point and applies at once;
   // turning it off is the largest loosening there is and waits like any other.
   if (from.enforcementEnabled != to.enforcementEnabled) {

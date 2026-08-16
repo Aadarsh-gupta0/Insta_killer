@@ -41,16 +41,22 @@ class Permissions {
   Permissions({
     required this.accessibility,
     required this.notificationAccess,
+    required this.deviceAdmin,
   });
 
   bool accessibility;
 
   bool notificationAccess;
 
+  /// FR-28 — whether the app is an active device administrator, which makes Android
+  /// refuse to uninstall it until the admin is deactivated in Settings.
+  bool deviceAdmin;
+
   Object encode() {
     return <Object?>[
       accessibility,
       notificationAccess,
+      deviceAdmin,
     ];
   }
 
@@ -59,6 +65,7 @@ class Permissions {
     return Permissions(
       accessibility: result[0]! as bool,
       notificationAccess: result[1]! as bool,
+      deviceAdmin: result[2]! as bool,
     );
   }
 }
@@ -324,6 +331,90 @@ class OfficeHostApi {
       );
     } else {
       return;
+    }
+  }
+
+  /// Opens the system screen that asks the user to make this app a device administrator.
+  ///
+  /// Returns nothing useful — the answer arrives asynchronously as a broadcast, so the
+  /// caller re-reads [state] when it comes back rather than waiting on a result.
+  Future<void> requestDeviceAdmin() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.insta_killer.OfficeHostApi.requestDeviceAdmin$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(null) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  /// Gives up device administrator status.
+  ///
+  /// Gated in Dart behind the cooldown and the Guardian, because dropping it makes the
+  /// app removable again — the loosening that matters most.
+  Future<void> releaseDeviceAdmin() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.insta_killer.OfficeHostApi.releaseDeviceAdmin$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(null) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  /// When the admin was last enabled or disabled, as `enabled:<epochMs>` or
+  /// `disabled:<epochMs>`. Empty when it has never happened.
+  ///
+  /// Deactivation happens in system Settings, outside our process and possibly while the
+  /// app is not running at all, so it can only be read after the fact.
+  Future<String> lastAdminEvent() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.insta_killer.OfficeHostApi.lastAdminEvent$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(null) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as String?)!;
     }
   }
 

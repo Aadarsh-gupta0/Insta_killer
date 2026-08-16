@@ -31,6 +31,10 @@ enum LaunchReason {
 class Permissions {
   late bool accessibility;
   late bool notificationAccess;
+
+  /// FR-28 — whether the app is an active device administrator, which makes Android
+  /// refuse to uninstall it until the admin is deactivated in Settings.
+  late bool deviceAdmin;
 }
 
 /// A launchable app on this device, for the Blocklist screen.
@@ -95,6 +99,25 @@ abstract class OfficeHostApi {
   void setWatchedPackages(List<String> packageNames);
 
   void setBlockingEnabled(bool enabled);
+
+  /// Opens the system screen that asks the user to make this app a device administrator.
+  ///
+  /// Returns nothing useful — the answer arrives asynchronously as a broadcast, so the
+  /// caller re-reads [state] when it comes back rather than waiting on a result.
+  void requestDeviceAdmin();
+
+  /// Gives up device administrator status.
+  ///
+  /// Gated in Dart behind the cooldown and the Guardian, because dropping it makes the
+  /// app removable again — the loosening that matters most.
+  void releaseDeviceAdmin();
+
+  /// When the admin was last enabled or disabled, as `enabled:<epochMs>` or
+  /// `disabled:<epochMs>`. Empty when it has never happened.
+  ///
+  /// Deactivation happens in system Settings, outside our process and possibly while the
+  /// app is not running at all, so it can only be read after the fact.
+  String lastAdminEvent();
 
   /// Suspends blocking until [endsAtEpochMs] and schedules the T-2min and T-0
   /// notifications (FR-19). The watcher reads the same timestamp, so a permit is

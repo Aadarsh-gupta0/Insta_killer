@@ -111,6 +111,18 @@ void main() {
       expect(classifyChange(base, base.copyWith()), ChangeDirection.neutral);
     });
 
+    test('taking on uninstall protection tightens', () {
+      expect(
+        classifyChange(base, base.copyWith(uninstallProtection: true)),
+        ChangeDirection.tighten,
+      );
+    });
+
+    test('giving up uninstall protection loosens', () {
+      final protected = base.copyWith(uninstallProtection: true);
+      expect(classifyChange(protected, base), ChangeDirection.loosen);
+    });
+
     test('switching enforcement on tightens', () {
       expect(
         classifyChange(base, base.copyWith(enforcementEnabled: true)),

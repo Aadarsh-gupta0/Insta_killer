@@ -29,6 +29,7 @@ class OfficeStore(context: Context) {
         private const val KEY_GRANT_ENDS_AT = "grant_ends_at"
         private const val KEY_WATCHER_HEARTBEAT = "watcher_heartbeat"
         private const val KEY_WATCHED = "watched_packages"
+        private const val KEY_ADMIN_EVENT = "admin_event"
         private const val BLOB_PREFIX = "blob."
 
         /// Still referenced by the VIP probe, which only reads Instagram's notifications.
@@ -78,6 +79,23 @@ class OfficeStore(context: Context) {
     var watcherHeartbeat: Long
         get() = prefs.getLong(KEY_WATCHER_HEARTBEAT, 0L)
         set(value) = prefs.edit().putLong(KEY_WATCHER_HEARTBEAT, value).apply()
+
+    /**
+     * When the device admin was last switched on or off, and which it was.
+     *
+     * Written by [AdminReceiver], which fires outside any Flutter engine — the app may not
+     * be running at all when the user deactivates the admin from Settings. Read by Dart on
+     * the next foreground so the Record can show it and the UI never claims a protection
+     * that is no longer there.
+     */
+    fun recordAdminEvent(what: String) {
+        prefs.edit()
+            .putString(KEY_ADMIN_EVENT, "$what:${System.currentTimeMillis()}")
+            .apply()
+    }
+
+    val lastAdminEvent: String?
+        get() = prefs.getString(KEY_ADMIN_EVENT, null)
 
     fun readBlob(key: String): String? = prefs.getString(BLOB_PREFIX + key, null)
 

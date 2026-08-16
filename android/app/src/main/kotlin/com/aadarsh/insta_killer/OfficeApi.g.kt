@@ -75,20 +75,27 @@ enum class LaunchReason(val raw: Int) {
  */
 data class Permissions (
   val accessibility: Boolean,
-  val notificationAccess: Boolean
+  val notificationAccess: Boolean,
+  /**
+   * FR-28 — whether the app is an active device administrator, which makes Android
+   * refuse to uninstall it until the admin is deactivated in Settings.
+   */
+  val deviceAdmin: Boolean
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): Permissions {
       val accessibility = pigeonVar_list[0] as Boolean
       val notificationAccess = pigeonVar_list[1] as Boolean
-      return Permissions(accessibility, notificationAccess)
+      val deviceAdmin = pigeonVar_list[2] as Boolean
+      return Permissions(accessibility, notificationAccess, deviceAdmin)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
       accessibility,
       notificationAccess,
+      deviceAdmin,
     )
   }
 }
@@ -254,6 +261,28 @@ interface OfficeHostApi {
   fun setWatchedPackages(packageNames: List<String>)
   fun setBlockingEnabled(enabled: Boolean)
   /**
+   * Opens the system screen that asks the user to make this app a device administrator.
+   *
+   * Returns nothing useful — the answer arrives asynchronously as a broadcast, so the
+   * caller re-reads [state] when it comes back rather than waiting on a result.
+   */
+  fun requestDeviceAdmin()
+  /**
+   * Gives up device administrator status.
+   *
+   * Gated in Dart behind the cooldown and the Guardian, because dropping it makes the
+   * app removable again — the loosening that matters most.
+   */
+  fun releaseDeviceAdmin()
+  /**
+   * When the admin was last enabled or disabled, as `enabled:<epochMs>` or
+   * `disabled:<epochMs>`. Empty when it has never happened.
+   *
+   * Deactivation happens in system Settings, outside our process and possibly while the
+   * app is not running at all, so it can only be read after the fact.
+   */
+  fun lastAdminEvent(): String
+  /**
    * Suspends blocking until [endsAtEpochMs] and schedules the T-2min and T-0
    * notifications (FR-19). The watcher reads the same timestamp, so a permit is
    * honoured even if every alarm is dropped.
@@ -338,6 +367,53 @@ interface OfficeHostApi {
             val wrapped: List<Any?> = try {
               api.setBlockingEnabled(enabledArg)
               listOf(null)
+            } catch (exception: Throwable) {
+              wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.insta_killer.OfficeHostApi.requestDeviceAdmin$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              api.requestDeviceAdmin()
+              listOf(null)
+            } catch (exception: Throwable) {
+              wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.insta_killer.OfficeHostApi.releaseDeviceAdmin$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              api.releaseDeviceAdmin()
+              listOf(null)
+            } catch (exception: Throwable) {
+              wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.insta_killer.OfficeHostApi.lastAdminEvent$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.lastAdminEvent())
             } catch (exception: Throwable) {
               wrapError(exception)
             }

@@ -13,14 +13,18 @@ class FakeHost extends OfficeHostApi {
   FakeHost({
     this.accessibility = true,
     this.notificationAccess = true,
+    this.deviceAdmin = false,
     this.heartbeat = 0,
   });
 
   bool accessibility;
   bool notificationAccess;
+  bool deviceAdmin;
   int heartbeat;
 
   int accessibilitySettingsOpened = 0;
+  int adminRequests = 0;
+  int adminReleases = 0;
 
   @override
   Future<NativeState> state() async => NativeState(
@@ -30,6 +34,7 @@ class FakeHost extends OfficeHostApi {
         permissions: Permissions(
           accessibility: accessibility,
           notificationAccess: notificationAccess,
+          deviceAdmin: deviceAdmin,
         ),
         lastWatcherHeartbeatEpochMs: heartbeat,
       );
@@ -43,6 +48,15 @@ class FakeHost extends OfficeHostApi {
 
   @override
   Future<void> setWatchedPackages(List<String> packageNames) async {}
+
+  @override
+  Future<void> requestDeviceAdmin() async => adminRequests++;
+
+  @override
+  Future<void> releaseDeviceAdmin() async => adminReleases++;
+
+  @override
+  Future<String> lastAdminEvent() async => '';
 }
 
 void main() {
@@ -57,10 +71,11 @@ void main() {
     OfficeRules rules = const OfficeRules(),
     PendingChange? pending,
     bool accessibility = true,
+    bool deviceAdmin = false,
   }) async {
     repo = InMemoryOfficeRepository(rules: rules, pendingChange: pending);
     clock = FakeClock(wall: afternoon);
-    host = FakeHost(accessibility: accessibility);
+    host = FakeHost(accessibility: accessibility, deviceAdmin: deviceAdmin);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -190,6 +205,65 @@ void main() {
 
       expect(await repo.loadPendingChange(), isNull);
       expect(find.text('CHANGE QUEUED'), findsNothing);
+    });
+  });
+
+  group('FR-28 — uninstall protection', () {
+    testWidgets('offers to turn it on, and asks the system rather than itself',
+        (tester) async {
+      await pumpRules(tester);
+
+      expect(find.text('off'), findsWidgets);
+      await tap(tester, 'TURN ON PROTECTION');
+
+      expect(host.adminRequests, 1,
+          reason: 'only the system can grant device admin');
+    });
+
+    testWidgets('records it once the platform reports it active',
+        (tester) async {
+      await pumpRules(tester, deviceAdmin: true);
+
+      expect((await repo.loadRules()).uninstallProtection, isTrue);
+      expect(find.text('active'), findsOneWidget);
+    });
+
+    testWidgets('giving it up waits out the cooldown', (tester) async {
+      await pumpRules(
+        tester,
+        rules: const OfficeRules(uninstallProtection: true),
+        deviceAdmin: true,
+      );
+
+      await tap(tester, 'REQUEST PROTECTION OFF');
+
+      expect((await repo.loadRules()).uninstallProtection, isTrue,
+          reason: 'still protected until the cooldown elapses');
+      expect(await repo.loadPendingChange(), isNotNull);
+      expect(host.adminReleases, 0);
+    });
+
+    testWidgets('stops claiming protection the user revoked in Settings',
+        (tester) async {
+      // Rules say protected; the platform says otherwise. Reality wins, immediately —
+      // there is nothing to make the user wait for, and claiming a protection we do not
+      // have would be the dishonesty NFR-7 forbids.
+      await pumpRules(
+        tester,
+        rules: const OfficeRules(uninstallProtection: true),
+        deviceAdmin: false,
+      );
+
+      expect((await repo.loadRules()).uninstallProtection, isFalse);
+      expect(await repo.loadPendingChange(), isNull,
+          reason: 'it is already gone; queueing it would be theatre');
+
+      final events = await repo.loadEvents();
+      expect(
+        events.any((e) => e.detail?.contains('removed in system settings') ?? false),
+        isTrue,
+        reason: 'the Record should show when it happened',
+      );
     });
   });
 

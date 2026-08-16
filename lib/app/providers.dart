@@ -182,6 +182,7 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
     switch (outcome) {
       case ChangeApplied(:final rules):
         await _repo.saveRules(rules);
+        await _releaseAdminIfDropped(current.rules, rules);
 
         // A queued change carries a full snapshot of the rules as they were when it was
         // requested, so anything applied since would be silently reverted the moment it
@@ -248,6 +249,52 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
   }
 
   // --- FR-27, the Guardian ------------------------------------------------------
+
+  // --- FR-28, uninstall protection ----------------------------------------------
+
+  /// Brings the stored rule into line with what the platform actually reports.
+  ///
+  /// Two directions, and they are not symmetrical.
+  ///
+  /// **Off in reality, on in our rules** — the user deactivated the admin in Android
+  /// Settings, which happens outside this process and cannot be refused. The protection
+  /// is already gone, so the rule is corrected immediately rather than queued: claiming a
+  /// protection we do not have would be the exact dishonesty NFR-7 forbids, and there is
+  /// nothing to make them wait for.
+  ///
+  /// **On in reality, off in our rules** — they granted it at the system prompt. A
+  /// tightening, so it is recorded at once.
+  Future<void> reconcileDeviceAdmin(bool activeNatively) async {
+    final current = await future;
+    if (current.rules.uninstallProtection == activeNatively) return;
+
+    final rules = current.rules.copyWith(uninstallProtection: activeNatively);
+    final event = Event(
+      at: _clock.wall(),
+      kind: EventKind.settingChanged,
+      detail: activeNatively
+          ? 'uninstall protection taken on'
+          : 'uninstall protection removed in system settings',
+    );
+
+    await _repo.append(event);
+    await _repo.saveRules(rules);
+    state = AsyncData(current.copyWith(
+      rules: rules,
+      events: [...current.events, event],
+    ));
+  }
+
+  /// Gives up device admin when a queued change that drops it finally lands.
+  ///
+  /// Only ever called for the true → false direction. Taking protection *on* needs the
+  /// system prompt and the user's tap, so it can never be a side effect of a rule
+  /// applying.
+  Future<void> _releaseAdminIfDropped(OfficeRules before, OfficeRules after) async {
+    if (before.uninstallProtection && !after.uninstallProtection) {
+      await ref.read(hostApiProvider).releaseDeviceAdmin();
+    }
+  }
 
   /// A challenge that proves a second device holds the secret.
   ApprovalRequest pairingChallenge() => _guardians.pairingChallenge(
@@ -465,6 +512,7 @@ class OfficeNotifier extends AsyncNotifier<OfficeState> {
           approved: current.approvalGranted,
         )) {
       await _repo.saveRules(pending.resulting);
+      await _releaseAdminIfDropped(current.rules, pending.resulting);
       await _repo.savePendingChange(null);
       await _repo.saveApprovalRequest(null);
       await _repo.saveApprovalGranted(false);

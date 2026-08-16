@@ -24,6 +24,7 @@ class OfficeRules {
     this.blockedPackages = const {},
     this.enforcementEnabled = false,
     this.guardianPaired = false,
+    this.uninstallProtection = false,
   });
 
   final QuotaPolicy quota;
@@ -51,6 +52,14 @@ class OfficeRules {
 
   int get blockedAppCount => blockedPackages.length;
 
+  /// FR-28 — whether the app is registered as a device administrator.
+  ///
+  /// A rule rather than a switch for the same reason as [enforcementEnabled]: turning it
+  /// off makes the app easier to remove, which is a loosening, and it goes through the
+  /// cooldown and the Guardian like everything else. Otherwise the strongest thing in the
+  /// app is one tap away from being off.
+  final bool uninstallProtection;
+
   /// FR-27 — whether a Guardian currently has to agree to loosenings.
   ///
   /// Only the flag lives here. The pairing's name and the shared secret are stored
@@ -66,6 +75,7 @@ class OfficeRules {
     Set<String>? blockedPackages,
     bool? enforcementEnabled,
     bool? guardianPaired,
+    bool? uninstallProtection,
   }) =>
       OfficeRules(
         quota: quota ?? this.quota,
@@ -75,6 +85,7 @@ class OfficeRules {
         blockedPackages: blockedPackages ?? this.blockedPackages,
         enforcementEnabled: enforcementEnabled ?? this.enforcementEnabled,
         guardianPaired: guardianPaired ?? this.guardianPaired,
+        uninstallProtection: uninstallProtection ?? this.uninstallProtection,
       );
 
   Map<String, Object?> toJson() => {
@@ -85,6 +96,7 @@ class OfficeRules {
         'blockedPackages': blockedPackages.toList()..sort(),
         'enforcementEnabled': enforcementEnabled,
         'guardianPaired': guardianPaired,
+        'uninstallProtection': uninstallProtection,
       };
 
   /// Missing keys fall back to the stricter default rather than throwing.
@@ -109,6 +121,7 @@ class OfficeRules {
             : (json['blockedPackages']! as List<Object?>).cast<String>().toSet(),
         enforcementEnabled: json['enforcementEnabled'] as bool? ?? false,
         guardianPaired: json['guardianPaired'] as bool? ?? false,
+        uninstallProtection: json['uninstallProtection'] as bool? ?? false,
       );
 }
 
